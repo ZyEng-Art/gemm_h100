@@ -1,0 +1,7 @@
+gemm_bench
+gemm_bench_*
+*.o
+*.out
+.tmp/
+__pycache__/
+

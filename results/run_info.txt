@@ -1,0 +1,10 @@
+# Commands
+cd /SharedData/dengzy/kernel
+./run_gemm_bench.sh > results/default_benchmark.txt
+./run_gemm_roofline.sh
+
+# Date
+2026-08-26T19:13:41+08:00
+
+# GPU
+NVIDIA H100 80GB HBM3, 9.0, 1980 MHz, 81559 MiB
