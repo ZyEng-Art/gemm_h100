@@ -1,0 +1,26 @@
+Hardware:
+  device: 0
+  name: NVIDIA H100 80GB HBM3
+  compute capability: 9.0
+  SM count: 132
+  max threads per SM: 2048
+  max threads per block: 1024
+  warp size: 32
+  SM clock: 1980.0 MHz
+  memory clock: 2619.0 MHz
+  global memory: 79.18 GiB
+  memory bus width: 5120 bit
+  L2 cache: 51200.0 KiB
+  shared memory per block: 48.0 KiB
+  shared memory per block opt-in: 227.0 KiB
+  shared memory per SM: 228.0 KiB
+  registers per block: 65536
+  registers per SM: 65536
+  theoretical peak used: 66.908 TFLOPS (--peak-mode fp32)
+  HBM bandwidth used for roofline: 3.350 TB/s
+
+Timing: warmup=1, repeat=2, cuBLAS=off, check=on
+      M      N      K   custom_ms      custom_TF    peak_%        AI     roof_TF    bound    roof_%   cublas_ms      cublas_TF    peak_%    roof_%     max_abs     max_rel       bad      ok
+    128    128    128       0.208          0.020     0.030    21.333      66.908  compute     0.030         nan            nan       nan       nan    0.00e+00    0.00e+00         0     yes
+    130    130    130       0.252          0.017     0.026    21.667      66.908  compute     0.026         nan            nan       nan       nan    0.00e+00    0.00e+00         0     yes
+   4096   4096   4096      46.900          2.930     4.380   682.667      66.908  compute     4.380         nan            nan       nan       nan    0.00e+00    0.00e+00         0     yes

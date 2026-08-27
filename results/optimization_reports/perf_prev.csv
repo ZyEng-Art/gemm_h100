@@ -1,0 +1,5 @@
+M,N,K,custom_ms,custom_tflops,custom_peak_pct,ideal_dram_bytes,ai_flop_per_byte,hbm_tbps,compute_peak_tflops,mem_roof_tflops,roofline_tflops,roofline_bound,custom_roofline_pct,cublas_ms,cublas_tflops,cublas_peak_pct,cublas_roofline_pct,max_abs,max_rel,bad_count,passed
+512,512,512,0.04168,6.44039,9.62572,3.14573e+06,85.3333,3.35,66.9082,285.867,66.9082,compute,9.62572,nan,nan,nan,nan,0,0,0,1
+1024,1024,1024,0.299022,7.18168,10.7336,1.25829e+07,170.667,3.35,66.9082,571.733,66.9082,compute,10.7336,nan,nan,nan,nan,0,0,0,1
+2048,2048,2048,2.29105,7.49868,11.2074,5.03316e+07,341.333,3.35,66.9082,1143.47,66.9082,compute,11.2074,nan,nan,nan,nan,0,0,0,1
+4096,4096,4096,18.1749,7.56203,11.3021,2.01327e+08,682.667,3.35,66.9082,2286.93,66.9082,compute,11.3021,nan,nan,nan,nan,0,0,0,1

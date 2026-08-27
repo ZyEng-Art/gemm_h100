@@ -26,39 +26,93 @@
 #include <string>
 #include <vector>
 
-#ifndef GEMM_TILE
-#define GEMM_TILE 16
-#endif
+#define BM 128
+#define BN 128
+#define BK 32
 
+#define TM 8
+#define TN 8
+#define TK 8
 // ========================= Optimize this kernel =========================
+__device__ void move_shm_out(const float* __restrict__ A,
+                        float * shm,
+                        int start_row,
+                        int start_col,
+                        int bm,
+                        int bn,
+                        int M,
+                        int N) {
+  int num_elements = bm * bn;
+  int nthreads = blockDim.y * blockDim.x;
+  int tid = threadIdx.y * blockDim.x + threadIdx.x;
+  for(int i = tid; i < num_elements; i += nthreads) {
+    int row = i / bn;
+    int col = i % bn;
+    shm[row * bn + col] = A[(start_row + row) * N + (start_col + col)];
+  }
+}
 
+__device__ void move_shm_in(const float* __restrict__ A,
+                        float * shm,
+                        int tid,
+                        int start_row,
+                        int start_col,
+                        int bm,
+                        int bn,
+                        int M,
+                        int N) {
+  int num_elements = bm * bn;
+  int nthreads = blockDim.y * blockDim.x;
+  for(int i = tid; i < num_elements; i += nthreads) {
+    int row = i / bn;
+    int col = i % bn;
+    shm[row * bn + col] = 0;
+    if (start_row + row < M && start_col + col < N)
+      shm[row * bn + col] = A[(start_row + row) * N + (start_col + col)];
+  }
+}
 __global__ void gemm_kernel(const float* __restrict__ A,
                             const float* __restrict__ B,
                             float* __restrict__ C,
                             int M,
                             int N,
                             int K) {
-    __shared__ float shm_A[GEMM_TILE][GEMM_TILE];
-    __shared__ float shm_B[GEMM_TILE][GEMM_TILE];
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-    shm_A[threadIdx.y][threadIdx.x] = shm_B[threadIdx.y][threadIdx.x] = 0.0;
-    float sum = 0;
-    for(int k = 0; k < K; k += GEMM_TILE) {
-        int row_a = row;
-        int col_a = k  + threadIdx.x;
-        int row_b = k  + threadIdx.y;
-        int col_b = col;
-        if (row_a < M && col_a < K)
-          shm_A[threadIdx.y][threadIdx.x] = A[row_a * K + col_a];
-        if (row_b < K && col_b < N) 
-          shm_B[threadIdx.y][threadIdx.x] = B[row_b * N + col_b];
-        __syncthreads();
-        for(int i = 0; i < GEMM_TILE; i++)
-          sum += shm_A[threadIdx.y][i] * shm_B[i][threadIdx.x];
-        __syncthreads();
+    __shared__ float shm_A[BM * BK];
+    __shared__ float shm_B[BK * BN];
+    int block_row_start = blockIdx.y * BM;
+    int block_col_start = blockIdx.x * BN;
+
+    int row_start = block_row_start + threadIdx.y * TM;
+    int col_start = block_col_start + threadIdx.x * TN;
+    int tid = threadIdx.y * blockDim.x + threadIdx.x;
+    float tmp_c[TM][TN] = {0.0};
+    for (int bk = 0; bk < K; bk += BK){
+      // 协作搬运
+      move_shm_in(A, shm_A, tid, blockIdx.y * BM, bk, BM, BK, M, K);
+      move_shm_in(B, shm_B, tid, bk, blockIdx.x * BN, BK, BN, K, N);
+      __syncthreads();
+      // 实现这个shm tile 的乘法,分成一些register tile的乘法
+      for(int i = 0; i < BK; i += TK) {
+       for(int tm = 0; tm < TM; tm++) {
+        for(int tn = 0; tn < TN; tn++) {
+          for(int tk = 0; tk < TK; tk++) {
+            if (row_start + tm < M && col_start + tn < N) {
+              // printf("%d %d", row_start + tm, col_start + tn);
+              tmp_c[tm][tn] += shm_A[((threadIdx.y * TM)+ tm) * BK + i + tk]
+             * shm_B[(i + tk) * BN + threadIdx.x * TN + tn];
+            }
+          }
+        }
+       }
+      }
+      __syncthreads();
     }
-    C[row * N + col] = sum;
+      for(int i = 0; i < TM; i++) {
+        for(int j = 0; j < TN; j++) {
+          if (row_start + i < M && col_start + j < N)
+            C[(row_start + i)* N + col_start + j] = tmp_c[i][j];
+        }
+      }
 }
 
 // ===================== Benchmark code below this line =====================
@@ -336,9 +390,9 @@ static void launch_custom(const float* d_A,
                           const float* d_B,
                           float* d_C,
                           const Problem& p) {
-  dim3 block(GEMM_TILE, GEMM_TILE);
-  dim3 grid((p.N + GEMM_TILE - 1) / GEMM_TILE,
-            (p.M + GEMM_TILE - 1) / GEMM_TILE);
+  dim3 block(BN / TN, BM / TM);
+  dim3 grid((p.N + BN - 1) / BN,
+            (p.M + BM - 1) / BM);
   gemm_kernel<<<grid, block>>>(d_A, d_B, d_C, p.M, p.N, p.K);
   CUDA_CHECK(cudaGetLastError());
 }
