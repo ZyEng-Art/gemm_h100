@@ -1,7 +1,16 @@
 gemm_bench
 gemm_bench_*
+gemm_roofline.csv
+roofline.svg
 *.o
 *.out
 .tmp/
 __pycache__/
-
+results/profile/
+results/profile_*/
+*.nsys-rep
+*.ncu-rep
+*.qdrep
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
