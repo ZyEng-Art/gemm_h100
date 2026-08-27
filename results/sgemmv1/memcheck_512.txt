@@ -22,5 +22,5 @@ Hardware:
 
 Timing: warmup=1, repeat=2, cuBLAS=off, check=on
       M      N      K   custom_ms      custom_TF    peak_%        AI     roof_TF    bound    roof_%   cublas_ms      cublas_TF    peak_%    roof_%     max_abs     max_rel       bad      ok
-    130    130    130      15.259          0.000     0.000    21.667      66.908  compute     0.000         nan            nan       nan       nan    0.00e+00    0.00e+00         0     yes
+    512    512    512       1.661          0.162     0.241    85.333      66.908  compute     0.241         nan            nan       nan       nan    9.06e-06    5.84e-02         0     yes
 ========= ERROR SUMMARY: 0 errors
