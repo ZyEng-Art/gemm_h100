@@ -92,27 +92,29 @@ __global__ void gemm_kernel(const float* __restrict__ A,
       move_shm_in(B, shm_B, tid, bk, blockIdx.x * BN, BK, BN, K, N);
       __syncthreads();
       // 实现这个shm tile 的乘法,分成一些register tile的乘法
+      #pragma unroll
       for(int i = 0; i < BK; i += TK) {
+       #pragma unroll
        for(int tm = 0; tm < TM; tm++) {
+        #pragma unroll
         for(int tn = 0; tn < TN; tn++) {
+          #pragma unroll
           for(int tk = 0; tk < TK; tk++) {
-            if (row_start + tm < M && col_start + tn < N) {
-              // printf("%d %d", row_start + tm, col_start + tn);
               tmp_c[tm][tn] += shm_A[((threadIdx.y * TM)+ tm) * BK + i + tk]
              * shm_B[(i + tk) * BN + threadIdx.x * TN + tn];
-            }
           }
         }
        }
       }
       __syncthreads();
     }
-      for(int i = 0; i < TM; i++) {
-        for(int j = 0; j < TN; j++) {
-          if (row_start + i < M && col_start + j < N)
-            C[(row_start + i)* N + col_start + j] = tmp_c[i][j];
-        }
+
+    for(int i = 0; i < TM; i++) {
+      for(int j = 0; j < TN; j++) {
+        if (row_start + i < M && col_start + j < N)
+          C[(row_start + i)* N + col_start + j] = tmp_c[i][j];
       }
+    }
 }
 
 // ===================== Benchmark code below this line =====================
