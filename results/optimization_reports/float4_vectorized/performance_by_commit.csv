@@ -1,0 +1,10 @@
+commit,change,kernel_target,shape_512_ms,shape_512_tflops,shape_1024_ms,shape_1024_tflops,shape_2048_ms,shape_2048_tflops,shape_4096_ms,shape_4096_tflops,notes
+b1f1322,Add H100 GEMM benchmark and roofline results,gemm.cu baseline,0.041720,6.43422,0.299122,7.17930,2.29336,7.49115,18.2685,7.52327,first benchmarked baseline
+707d379,Add Nsight profiling script,unchanged,0.041720,6.43422,0.299122,7.17930,2.29336,7.49115,18.2685,7.52327,script-only commit
+012b678,Initialize h100 working tree metadata,unchanged,0.041720,6.43422,0.299122,7.17930,2.29336,7.49115,18.2685,7.52327,metadata/script cleanup
+1fcccfe,Allow shell scripts to reexec bash,unchanged,0.041680,6.44039,0.299022,7.18168,2.29105,7.49868,18.1749,7.56203,rebenchmarked before BM128 change
+558e70f,Add BM128 BN128 BK32 GEMM experiment,gemm.cu BM128/BK32 local accumulator,0.786862,0.341147,1.61040,1.33351,5.51527,3.11496,47.2159,2.91086,tmp_c 8x8 used 256 B stack frame
+1e31b73,Add SGEMM V1 benchmark snapshot,superseded sgemmv1.cu snapshot,0.786466,0.341319,1.60905,1.33463,5.51387,3.11575,47.2509,2.90870,mistaken snapshot later corrected
+fc046a7,Replace SGEMM v1 snapshot with actual kernel,actual sgemmv1.cu,0.0805488,3.33258,0.155350,13.8235,0.503141,34.1453,4.07045,33.7650,actual vectorized SGEMM V1
+054d420,Keep GEMM accumulator in registers,gemm.cu register-unrolled BM128/BK32,0.104346,2.57256,0.193710,11.0861,0.943533,18.2080,7.41717,18.5298,tmp_c 8x8 scalarized into registers
+this_commit,Add float4 vectorized load/store,gemm.cu float4 vectorized BM128/BK32,0.0753632,3.56189,0.146504,14.6582,0.467397,36.7565,3.66825,37.4672,aligned-shape fast path

@@ -33,8 +33,13 @@
 #define TM 8
 #define TN 8
 #define TK 8
+
+#define OFFSET(row_offset, col_len, col_offset) (row_offset) * (col_len) + col_offset
+#define FLOAT4(pointer) (reinterpret_cast<float4*>(&(pointer))[0])
+
+#define MOVONCE 4
 // ========================= Optimize this kernel =========================
-__device__ void move_shm_out(const float* __restrict__ A,
+__device__ void move_shm_out(float* A,
                         float * shm,
                         int start_row,
                         int start_col,
@@ -42,17 +47,17 @@ __device__ void move_shm_out(const float* __restrict__ A,
                         int bn,
                         int M,
                         int N) {
-  int num_elements = bm * bn;
+  int num_elements = bm * bn / MOVONCE;
   int nthreads = blockDim.y * blockDim.x;
   int tid = threadIdx.y * blockDim.x + threadIdx.x;
   for(int i = tid; i < num_elements; i += nthreads) {
-    int row = i / bn;
-    int col = i % bn;
-    shm[row * bn + col] = A[(start_row + row) * N + (start_col + col)];
+    int row = (i << 2) / bn;
+    int col = (i << 2) % bn;
+    FLOAT4(shm[row * bn + col]) = FLOAT4(A[(start_row + row) * N + (start_col + col)]);
   }
 }
 
-__device__ void move_shm_in(const float* __restrict__ A,
+__device__ void move_shm_in(float* A,
                         float * shm,
                         int tid,
                         int start_row,
@@ -61,19 +66,18 @@ __device__ void move_shm_in(const float* __restrict__ A,
                         int bn,
                         int M,
                         int N) {
-  int num_elements = bm * bn;
+  int num_elements = bm * bn / 4;
   int nthreads = blockDim.y * blockDim.x;
   for(int i = tid; i < num_elements; i += nthreads) {
-    int row = i / bn;
-    int col = i % bn;
-    shm[row * bn + col] = 0;
+    int row = (i << 2) / bn;
+    int col = (i << 2) % bn;
     if (start_row + row < M && start_col + col < N)
-      shm[row * bn + col] = A[(start_row + row) * N + (start_col + col)];
+      FLOAT4(shm[row * bn + col]) = FLOAT4(A[(start_row + row) * N + (start_col + col)]);
   }
 }
-__global__ void gemm_kernel(const float* __restrict__ A,
-                            const float* __restrict__ B,
-                            float* __restrict__ C,
+__global__ void gemm_kernel(float* A,
+                            float* B,
+                            float* C,
                             int M,
                             int N,
                             int K) {
@@ -110,9 +114,9 @@ __global__ void gemm_kernel(const float* __restrict__ A,
     }
 
     for(int i = 0; i < TM; i++) {
-      for(int j = 0; j < TN; j++) {
+      for(int j = 0; j < TN; j+=4) {
         if (row_start + i < M && col_start + j < N)
-          C[(row_start + i)* N + col_start + j] = tmp_c[i][j];
+          FLOAT4(C[(row_start + i)* N + col_start + j]) = FLOAT4(tmp_c[i][j]);
       }
     }
 }
@@ -388,8 +392,8 @@ static void fill_random(std::vector<float>& v, std::uint64_t seed) {
   }
 }
 
-static void launch_custom(const float* d_A,
-                          const float* d_B,
+static void launch_custom(float* d_A,
+                          float* d_B,
                           float* d_C,
                           const Problem& p) {
   dim3 block(BN / TN, BM / TM);
