@@ -32,7 +32,6 @@
 
 #define TM 8
 #define TN 8
-#define TK 8
 
 #define OFFSET(row_offset, col_len, col_offset) (row_offset) * (col_len) + col_offset
 #define FLOAT4(pointer) (reinterpret_cast<float4*>(&(pointer))[0])
@@ -75,6 +74,12 @@ __device__ void move_shm_in(float* A,
       FLOAT4(shm[row * bn + col]) = FLOAT4(A[(start_row + row) * N + (start_col + col)]);
   }
 }
+// 因为一个线程的寄存器本身对不同元素就是可以共享的，
+// 因此可以不用像共享内存一样显示把小tile 放到寄存器中
+// 本来共享内存同一个迭代步k 同一行访问同一个元素，
+// 因为hbm对不同线程无法共享，使用共享内存共享
+// 现在这个线程的同一行的元素的结果直接访问共享内存这个迭代步的值即可
+// 所以这边寄存器层次对K 的划分TK 是没必要的
 __global__ void gemm_kernel(float* A,
                             float* B,
                             float* C,
@@ -97,16 +102,13 @@ __global__ void gemm_kernel(float* A,
       __syncthreads();
       // 实现这个shm tile 的乘法,分成一些register tile的乘法
       #pragma unroll
-      for(int i = 0; i < BK; i += TK) {
+      for(int i = 0; i < BK; i ++) {
        #pragma unroll
        for(int tm = 0; tm < TM; tm++) {
         #pragma unroll
         for(int tn = 0; tn < TN; tn++) {
-          #pragma unroll
-          for(int tk = 0; tk < TK; tk++) {
-              tmp_c[tm][tn] += shm_A[((threadIdx.y * TM)+ tm) * BK + i + tk]
-             * shm_B[(i + tk) * BN + threadIdx.x * TN + tn];
-          }
+            tmp_c[tm][tn] += shm_A[((threadIdx.y * TM)+ tm) * BK + i ]
+            * shm_B[(i) * BN + threadIdx.x * TN + tn];
         }
        }
       }
