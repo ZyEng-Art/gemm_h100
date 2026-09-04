@@ -74,6 +74,31 @@ __device__ void move_shm_in(float* A,
       FLOAT4(shm[row * bn + col]) = FLOAT4(A[(start_row + row) * N + (start_col + col)]);
   }
 }
+
+// __device__ void move_shm_in_T(float* A,
+//                         float * shm,
+//                         int tid,
+//                         int start_row,
+//                         int start_col,
+//                         int bm,
+//                         int bn,
+//                         int M,
+//                         int N) {
+//   int num_elements = bm * bn / 4;
+//   int nthreads = blockDim.y * blockDim.x;
+//   float r_load[4];
+//   for(int i = tid; i < num_elements; i += nthreads) {
+//     int row = (i << 2) / bn;
+//     int col = (i << 2) % bn;
+//     if (start_row + row < M && start_col + col < N) {
+//       FLOAT4(r_load[0]) = FLOAT4(A[(start_row + row) * N + (start_col + col)]);
+//       shm[col * bm + row] = r_load[0];
+//       shm[(col+1) * bm + row] = r_load[1];
+//       shm[(col+2) * bm + row] = r_load[2];
+//       shm[(col+3) * bm + row] = r_load[3];
+//     }
+//   }
+// }
 // 因为一个线程的寄存器本身对不同元素就是可以共享的，
 // 因此可以不用像共享内存一样显示把小tile 放到寄存器中
 // 本来共享内存同一个迭代步k 同一行访问同一个元素，
@@ -92,7 +117,7 @@ __global__ void gemm_kernel(float* A,
     int block_col_start = blockIdx.x * BN;
 
     int row_start = block_row_start + threadIdx.y * TM;
-    int col_start = block_col_start + threadIdx.x * TN;
+    int col_start = block_col_start + threadIdx.x * TN / 2;
     int tid = threadIdx.y * blockDim.x + threadIdx.x;
     float tmp_c[TM][TN] = {0.0};
     for (int bk = 0; bk < K; bk += BK){
@@ -106,19 +131,41 @@ __global__ void gemm_kernel(float* A,
        #pragma unroll
        for(int tm = 0; tm < TM; tm++) {
         #pragma unroll
-        for(int tn = 0; tn < TN; tn++) {
-            tmp_c[tm][tn] += shm_A[((threadIdx.y * TM)+ tm) * BK + i ]
-            * shm_B[(i) * BN + threadIdx.x * TN + tn];
+        for(int tn = 0; tn < TN / 2; tn+=4) {
+            float r_b0[4];
+            float r_b1[4];
+            FLOAT4(r_b0[0]) = FLOAT4(shm_B[(i) * BN + threadIdx.x * TN / 2 + tn + BN / 2]);
+            FLOAT4(r_b1[0]) = FLOAT4(shm_B[(i) * BN + threadIdx.x * TN / 2 + tn]);
+            for(int k = 0; k < 4; k++) {
+              tmp_c[tm][tn + k] += shm_A[(threadIdx.y * TM + tm) * BK + i]
+              * r_b1[k];
+              tmp_c[tm][tn + k + TN / 2] += shm_A[(threadIdx.y * TM + tm) * BK + i]
+              * r_b0[k];
+            }
         }
        }
       }
+
+      // #pragma unroll
+      // for(int i = 0; i < BK; i ++) {
+      //  #pragma unroll
+      //  for(int tm = 0; tm < TM; tm++) {
+      //   #pragma unroll
+      //   for(int tn = 0; tn < TN / 2; tn++) {
+
+      //   }
+      //  }
+      // }
+
       __syncthreads();
     }
 
     for(int i = 0; i < TM; i++) {
-      for(int j = 0; j < TN; j+=4) {
+      for(int j = 0; j < TN / 2; j+=4) {
         if (row_start + i < M && col_start + j < N)
           FLOAT4(C[(row_start + i)* N + col_start + j]) = FLOAT4(tmp_c[i][j]);
+        if (row_start + i < M && col_start + j + BN / 2 < N)
+          FLOAT4(C[(row_start + i)* N + col_start + j + BN / 2]) = FLOAT4(tmp_c[i][j + TN / 2]);
       }
     }
 }
