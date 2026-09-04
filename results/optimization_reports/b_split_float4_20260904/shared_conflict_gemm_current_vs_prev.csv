@@ -1,4 +1,4 @@
-metric,previous_commit,previous_value,previous_wavefronts,previous_conflict_per_wavefront,current_commit,current_value,current_wavefronts,current_conflict_per_wavefront,delta_current_minus_previous,change_pct,note
-shared_load_bank_conflicts,5d35995,268451537,671104721,0.40001438,03139ba,NA,NA,NA,NA,NA,current B-split GEMM NCU counter collection is blocked by ERR_NVGPUCTRPERM
-shared_store_bank_conflicts,5d35995,481387,34035819,0.01414354,03139ba,NA,NA,NA,NA,NA,current B-split GEMM NCU counter collection is blocked by ERR_NVGPUCTRPERM
-shared_total_bank_conflicts,5d35995,268932924,705140540,0.38138911,03139ba,NA,NA,NA,NA,NA,current B-split GEMM NCU counter collection is blocked by ERR_NVGPUCTRPERM
+label,commit,shape,gpu_time_ns,ld_conflicts,st_conflicts,total_conflicts,ld_wavefronts,st_wavefronts,total_wavefronts,ld_conflicts_per_wavefront,st_conflicts_per_wavefront,total_conflicts_per_wavefront,regs_per_thread,shared_mem_allocated_B,shared_mem_static_B,shared_mem_dynamic_B
+previous,5d35995,4096x4096x4096,3608768,268449772,823271,269273043,671102956,34377703,705480659,0.4000128,0.02394782,0.38168735,128,33792,32768,0
+current,03139ba,4096x4096x4096,3371168,73183,786535,859718,402726367,34340967,437067334,0.00018172,0.02290369,0.00196701,128,33792,32768,0
+delta_current_vs_previous_pct,03139ba_vs_5d35995,4096x4096x4096,-6.58396439,-99.97273866,-4.46220017,-99.6807263,-39.99037504,-0.10685996,-38.04687224,-99.95457172,-4.35999931,-99.48465282,0,0,0,

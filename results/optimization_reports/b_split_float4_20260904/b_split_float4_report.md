@@ -132,20 +132,24 @@ Previous GEMM commit:
 5d35995 Simplify GEMM K loop
 ```
 
-Fresh NCU counter collection for the current B-split GEMM is currently blocked for this user by `ERR_NVGPUCTRPERM`; see `ncu_permission_check.txt`.
+NCU counter collection was run inside Docker with `--cap-add=SYS_ADMIN --security-opt seccomp=unconfined`, because direct host-side NCU as the normal user hits `ERR_NVGPUCTRPERM`. The original failed non-Docker check is still kept in `ncu_permission_check.txt`.
 
-Because of that, this report does not claim a measured current-vs-previous shared conflict delta for `03139ba`. The table below records the available previous-version NCU reference and marks the current counter fields as `NA`.
-
-Available previous-version NCU reference:
+Comparison setup:
 
 ```text
-source: results/current_diag/head_device1_bank.csv
-copied: shared_conflict_prev_5d35995_4096_bank.csv
 shape: 4096x4096x4096
 kernel: gemm_kernel
 block: (16, 16, 1)
 grid: (32, 32, 1)
 registers/thread: 128
+static shared memory/block: 32768 B
+allocated shared memory/block: 33792 B
+warmup: 0
+repeat: 1
+correctness/cublas: disabled for profiling
+previous raw: shared_conflict_prev_5d35995_4096_bank.csv
+current raw: shared_conflict_current_03139ba_4096_bank.csv
+summary: shared_conflict_gemm_current_vs_prev.csv
 ```
 
 Raw metric names:
@@ -157,25 +161,24 @@ l1tex__data_pipe_lsu_wavefronts_mem_shared_op_ld.sum
 l1tex__data_pipe_lsu_wavefronts_mem_shared_op_st.sum
 ```
 
-| Metric | Previous `5d35995` | Previous wavefronts | Previous conflicts/wavefront | Current `03139ba` | Delta |
-|---|---:|---:|---:|---:|---:|
-| Shared load bank conflicts | 268,451,537 | 671,104,721 | 0.40001438 | NA | NA |
-| Shared store bank conflicts | 481,387 | 34,035,819 | 0.01414354 | NA | NA |
-| Shared total bank conflicts | 268,932,924 | 705,140,540 | 0.38138911 | NA | NA |
+| Metric | Previous `5d35995` | Previous wavefronts | Previous conflicts/wavefront | Current `03139ba` | Current wavefronts | Current conflicts/wavefront | Delta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Shared load bank conflicts | 268,449,772 | 671,102,956 | 0.40001280 | 73,183 | 402,726,367 | 0.00018172 | -99.9727% |
+| Shared store bank conflicts | 823,271 | 34,377,703 | 0.02394782 | 786,535 | 34,340,967 | 0.02290369 | -4.4622% |
+| Shared total bank conflicts | 269,273,043 | 705,480,659 | 0.38168735 | 859,718 | 437,067,334 | 0.00196701 | -99.6807% |
 
 Known performance delta for the same current-vs-previous GEMM comparison is still valid and is recorded above. At `4096x4096x4096`, current B-split GEMM improves from `37.5215` TFLOPS to `40.7334` TFLOPS, a `1.09x` speedup.
 
-Command to fill the missing current NCU counters when admin profiling is enabled:
+Docker NCU command pattern used for these raw files:
 
 ```bash
-CUDA_VISIBLE_DEVICES=7 \
-/usr/local/cuda-12.9/bin/ncu \
-  --metrics l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum,l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum,l1tex__data_pipe_lsu_wavefronts_mem_shared_op_ld.sum,l1tex__data_pipe_lsu_wavefronts_mem_shared_op_st.sum \
-  --target-processes all \
-  --csv --page raw \
-  --kernel-name gemm_kernel \
-  .tmp/b_split_float4_20260904/gemm_bench \
-  --shape 4096x4096x4096 --warmup 1 --repeat 1 --no-check --no-cublas
+docker run --rm --device nvidia.com/gpu=7 \
+  --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
+  -v /SharedData/dengzy/kernel:/work \
+  -v /usr/local/cuda-12.9:/usr/local/cuda-12.9:ro \
+  -w /work nvcr.io/nvidia/pytorch:26.04-py3 \
+  env -u BASH_ENV bash --noprofile --norc \
+  /work/.tmp/gemm_conflict_20260904/run_ncu_gemm_current_4096.sh
 ```
 
 ## Memcheck
@@ -202,11 +205,16 @@ Raw artifacts in this directory:
 
 - `run_info.txt`
 - `build.log`
+- `build_current_for_conflict.log`
+- `build_prev_5d35995_for_conflict.log`
 - `benchmark.txt`
 - `perf.csv`
 - `perf_comparison.csv`
 - `shared_conflict_gemm_current_vs_prev.csv`
 - `shared_conflict_prev_5d35995_4096_bank.csv`
+- `shared_conflict_prev_5d35995_4096_bank.stderr`
+- `shared_conflict_current_03139ba_4096_bank.csv`
+- `shared_conflict_current_03139ba_4096_bank.stderr`
 - `perf_prev_5d35995_reference.csv`
 - `ncu_permission_check.txt`
 - `memcheck_512.txt`

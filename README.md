@@ -207,21 +207,19 @@ The default shapes are all compute-bound under the ideal DRAM roofline model. Th
 
 Compared with previous commit `5d35995`, the current `4096x4096x4096` score improves from `37.5215` TFLOPS to `40.7334` TFLOPS, a `1.09x` speedup.
 
-Shared-memory bank conflict status for current `gemm.cu` versus previous `5d35995`:
+Shared-memory bank conflict status for current `gemm.cu` versus previous `5d35995`, collected with NCU inside Docker so hardware counters are available:
 
 ```text
 results/optimization_reports/b_split_float4_20260904/shared_conflict_gemm_current_vs_prev.csv
 ```
 
-The available previous-version 4096 NCU reference reports:
+| Metric | Previous `5d35995` | Previous conflicts/wavefront | Current `03139ba` | Current conflicts/wavefront | Delta |
+|---|---:|---:|---:|---:|---:|
+| shared load bank conflicts | 268,449,772 | 0.40001280 | 73,183 | 0.00018172 | -99.9727% |
+| shared store bank conflicts | 823,271 | 0.02394782 | 786,535 | 0.02290369 | -4.4622% |
+| shared total bank conflicts | 269,273,043 | 0.38168735 | 859,718 | 0.00196701 | -99.6807% |
 
-| Metric | Previous `5d35995` | Previous conflicts/wavefront | Current `03139ba` |
-|---|---:|---:|---:|
-| shared load bank conflicts | 268,451,537 | 0.40001438 | NA |
-| shared store bank conflicts | 481,387 | 0.01414354 | NA |
-| shared total bank conflicts | 268,932,924 | 0.38138911 | NA |
-
-Fresh current-version NCU counter collection is currently blocked by `ERR_NVGPUCTRPERM`, so the current-vs-previous shared conflict delta for `gemm.cu` is not yet measured. The failed permission check is logged in `results/optimization_reports/b_split_float4_20260904/ncu_permission_check.txt`.
+Both profiled binaries use `128` registers/thread and `32768 B` static shared memory/block (`33792 B` allocated). The raw NCU files are `shared_conflict_prev_5d35995_4096_bank.csv` and `shared_conflict_current_03139ba_4096_bank.csv`; the earlier non-Docker permission failure remains logged in `ncu_permission_check.txt`.
 
 ## SGEMM V2 Snapshot
 
