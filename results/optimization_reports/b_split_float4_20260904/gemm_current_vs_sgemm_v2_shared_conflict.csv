@@ -1,0 +1,4 @@
+metric,current_gemm_03139ba,current_gemm_wavefronts,current_gemm_conflict_per_wavefront,sgemm_v2,sgemm_v2_wavefronts,sgemm_v2_conflict_per_wavefront,v2_over_current_raw,v2_over_current_per_wavefront,current_reduction_vs_sgemm_v2_raw_pct,current_reduction_vs_sgemm_v2_per_wavefront_pct,note
+shared_load_bank_conflicts,73183,402726367,0.00018172,31168,100694464,0.00030953,0.425891,1.703335,-134.8017,41.2916,raw current is higher but normalized current is lower because wavefront counts differ
+shared_store_bank_conflicts,786535,34340967,0.02290369,4824453,13213061,0.36512758,6.133806,15.941867,83.6969,93.7272,main gap is associated with sgemm_v2 transposed A shared-store mapping
+shared_total_bank_conflicts,859718,437067334,0.00196701,4855621,113907525,0.04262775,5.647923,21.671344,82.2944,95.3856,current GEMM is lower overall

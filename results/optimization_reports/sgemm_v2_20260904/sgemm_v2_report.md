@@ -157,6 +157,17 @@ Interpretation:
 - Total shared-memory bank conflicts still drop by about `92.85%`, because V1's load conflict was much larger than its store conflict.
 - This conflict reduction does not fully translate into end-to-end speedup here. On the separately timed benchmark, current main GEMM is still about `1.03x` faster than SGEMM V2 at 4096.
 
+Cross-check against current main `gemm.cu`:
+
+| Metric | Current `gemm.cu` | SGEMM V2 | SGEMM V2 / current |
+|---|---:|---:|---:|
+| Shared store bank conflicts | 786,535 | 4,824,453 | 6.13x |
+| Shared store conflicts/wavefront | 0.02290369 | 0.36512758 | 15.94x |
+| Shared total bank conflicts | 859,718 | 4,855,621 | 5.65x |
+| Shared total conflicts/wavefront | 0.00196701 | 0.04262775 | 21.67x |
+
+This cross-check is not a strict one-change ablation because current main `gemm.cu` and the SGEMM V2 snapshot use different kernel bodies and `BK` values. The store-conflict gap is nevertheless consistent with the A transpose store mapping in V2: for `s_a[BK][BM]` with `BM=128`, `bank(s_a[k][m]) = m % 32`, and V2 maps paired lanes to the same `m` with different `k`. They therefore write different shared-memory addresses in the same bank. Current main keeps A shared stores vectorized and mostly contiguous, so it avoids most of that store-side penalty.
+
 ## Comparison With Previous Commit 5d35995
 
 Previous commit data source: `results/recheck_20260904/current_perf_no_check_gpu6.csv`

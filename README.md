@@ -270,4 +270,15 @@ Shared-memory bank conflict snapshot for `4096x4096x4096`, using existing root-c
 | shared store bank conflicts | 792,520 | 4,824,453 | +508.7484% |
 | shared total bank conflicts | 67,935,717 | 4,855,621 | -92.8526% |
 
+Cross-kernel comparison against current main `gemm.cu` is recorded in `results/optimization_reports/b_split_float4_20260904/gemm_current_vs_sgemm_v2_shared_conflict.csv`. It is not a strict one-change ablation because SGEMM V2 is a snapshot harness, but it explains the store-side conflict gap:
+
+| Metric | Current `gemm.cu` | SGEMM V2 | SGEMM V2 / current |
+|---|---:|---:|---:|
+| shared store bank conflicts | 786,535 | 4,824,453 | 6.13x |
+| shared store conflicts/wavefront | 0.02290369 | 0.36512758 | 15.94x |
+| shared total bank conflicts | 859,718 | 4,855,621 | 5.65x |
+| shared total conflicts/wavefront | 0.00196701 | 0.04262775 | 21.67x |
+
+The main store-conflict gap is consistent with SGEMM V2's transposed A shared layout. With `s_a[BK][BM]` and `BM=128`, the bank index for `s_a[k][m]` is effectively `m % 32`; SGEMM V2 maps adjacent lanes to the same `m` but different `k`, so paired lanes write different addresses in the same bank. Current `gemm.cu` mostly keeps shared stores vectorized and contiguous, avoiding that store-side penalty.
+
 Fresh NCU counter collection is currently blocked by `ERR_NVGPUCTRPERM`; the failed permission check is logged in `results/optimization_reports/sgemm_v2_20260904/ncu_permission_check.txt`.

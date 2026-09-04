@@ -169,6 +169,31 @@ l1tex__data_pipe_lsu_wavefronts_mem_shared_op_st.sum
 
 Known performance delta for the same current-vs-previous GEMM comparison is still valid and is recorded above. At `4096x4096x4096`, current B-split GEMM improves from `37.5215` TFLOPS to `40.7334` TFLOPS, a `1.09x` speedup.
 
+### Cross Check Against SGEMM V2
+
+This is a counter-level comparison, not a strict one-change ablation: current `gemm.cu` uses the B-split `BK=32` implementation, while `sgemm_v2.cu` is a wrapped snapshot using its own `BK=8` mapping. The comparison is still useful for identifying the store-conflict mechanism.
+
+Summary file:
+
+```text
+gemm_current_vs_sgemm_v2_shared_conflict.csv
+```
+
+| Metric | Current `gemm.cu` | SGEMM V2 | SGEMM V2 / current |
+|---|---:|---:|---:|
+| Shared load bank conflicts | 73,183 | 31,168 | 0.43x |
+| Shared load conflicts/wavefront | 0.00018172 | 0.00030953 | 1.70x |
+| Shared store bank conflicts | 786,535 | 4,824,453 | 6.13x |
+| Shared store conflicts/wavefront | 0.02290369 | 0.36512758 | 15.94x |
+| Shared total bank conflicts | 859,718 | 4,855,621 | 5.65x |
+| Shared total conflicts/wavefront | 0.00196701 | 0.04262775 | 21.67x |
+
+Interpretation:
+
+- Current `gemm.cu` has much lower store conflict than SGEMM V2: `83.70%` lower by raw store conflict count and `93.73%` lower after normalizing by store wavefronts.
+- The store-conflict gap is mainly explained by SGEMM V2's transposed A shared-memory write pattern. It writes `s_a[load_a_smem_k + q][load_a_smem_m]` into a `s_a[BK][BM]` layout. With `BM=128`, `bank(s_a[k][m]) = (k * 128 + m) % 32 = m % 32`; paired lanes can have the same `m` and different `k`, so they write different addresses in the same bank.
+- This means SGEMM V2 trades shared-load conflict reduction for a store-side conflict cost. Current `gemm.cu` mostly keeps shared stores as vectorized contiguous row-major stores, so it avoids most of that store-side penalty.
+
 Docker NCU command pattern used for these raw files:
 
 ```bash
@@ -210,6 +235,7 @@ Raw artifacts in this directory:
 - `benchmark.txt`
 - `perf.csv`
 - `perf_comparison.csv`
+- `gemm_current_vs_sgemm_v2_shared_conflict.csv`
 - `shared_conflict_gemm_current_vs_prev.csv`
 - `shared_conflict_prev_5d35995_4096_bank.csv`
 - `shared_conflict_prev_5d35995_4096_bank.stderr`
