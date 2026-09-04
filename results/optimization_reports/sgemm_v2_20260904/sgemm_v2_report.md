@@ -107,6 +107,56 @@ Current main data source: `results/optimization_reports/b_split_float4_20260904/
 | 2048x2048x2048 | 40.5117 | 39.2318 | 0.968x | 1.03x |
 | 4096x4096x4096 | 40.7334 | 39.4481 | 0.968x | 1.03x |
 
+## Shared Memory Bank Conflict
+
+Fresh NCU counter collection is currently blocked for this user by `ERR_NVGPUCTRPERM`; see `ncu_permission_check.txt`.
+
+The conflict table below uses the existing root-collected 4096x4096x4096 NCU CSV files from:
+
+```text
+results/profile_bankconflict/external_sgemm_compare/v1_4096_bank.csv
+results/profile_bankconflict/external_sgemm_compare/v2_4096_bank.csv
+```
+
+Those source CSVs are also copied into this report directory as:
+
+```text
+shared_conflict_v1_4096_bank.csv
+shared_conflict_v2_4096_bank.csv
+```
+
+Raw metric names:
+
+```text
+l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum
+l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum
+l1tex__data_pipe_lsu_wavefronts_mem_shared_op_ld.sum
+l1tex__data_pipe_lsu_wavefronts_mem_shared_op_st.sum
+```
+
+Conflict change from SGEMM V1 to SGEMM V2:
+
+| Metric | SGEMM V1 | SGEMM V2 | Delta | Change | V2 / V1 |
+|---|---:|---:|---:|---:|---:|
+| Shared load bank conflicts | 67,143,197 | 31,168 | -67,112,029 | -99.9536% | 0.000464x |
+| Shared store bank conflicts | 792,520 | 4,824,453 | +4,031,933 | +508.7484% | 6.087484x |
+| Shared total bank conflicts | 67,935,717 | 4,855,621 | -63,080,096 | -92.8526% | 0.071474x |
+
+Normalized by shared-memory wavefront count:
+
+| Metric | SGEMM V1 conflicts/wavefront | SGEMM V2 conflicts/wavefront | Delta | Change |
+|---|---:|---:|---:|---:|
+| Shared load | 0.40012276 | 0.00030953 | -0.39981323 | -99.9226% |
+| Shared store | 0.08632055 | 0.36512758 | +0.27880703 | +322.9903% |
+| Shared total | 0.38384446 | 0.04262775 | -0.34121671 | -88.8945% |
+
+Interpretation:
+
+- V2's transposed A shared-memory layout almost eliminates the shared-load bank conflict seen in V1.
+- The same change makes shared stores into `s_a[BK][BM]` much less coalesced at the bank level, so store conflict increases by about `6.09x`.
+- Total shared-memory bank conflicts still drop by about `92.85%`, because V1's load conflict was much larger than its store conflict.
+- This conflict reduction does not fully translate into end-to-end speedup here. On the separately timed benchmark, current main GEMM is still about `1.03x` faster than SGEMM V2 at 4096.
+
 ## Comparison With Previous Commit 5d35995
 
 Previous commit data source: `results/recheck_20260904/current_perf_no_check_gpu6.csv`
@@ -150,4 +200,8 @@ Raw artifacts in this directory:
 - `benchmark.txt`
 - `perf.csv`
 - `perf_comparison.csv`
+- `shared_conflict_comparison.csv`
+- `shared_conflict_v1_4096_bank.csv`
+- `shared_conflict_v2_4096_bank.csv`
+- `ncu_permission_check.txt`
 - `memcheck_512.txt`

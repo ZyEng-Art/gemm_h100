@@ -1,0 +1,4 @@
+metric,sgemm_v1,sgemm_v2,delta_v2_minus_v1,change_pct,v2_over_v1,sgemm_v1_wavefronts,sgemm_v2_wavefronts,conflict_per_wavefront_v1,conflict_per_wavefront_v2,conflict_per_wavefront_delta,conflict_per_wavefront_change_pct
+shared_load_bank_conflicts,67143197,31168,-67112029,-99.9536,0.000464,167806493,100694464,0.40012276,0.00030953,-0.39981323,-99.9226
+shared_store_bank_conflicts,792520,4824453,4031933,508.7484,6.087484,9181128,13213061,0.08632055,0.36512758,0.27880703,322.9903
+shared_total_bank_conflicts,67935717,4855621,-63080096,-92.8526,0.071474,176987621,113907525,0.38384446,0.04262775,-0.34121671,-88.8945

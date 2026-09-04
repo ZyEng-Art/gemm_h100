@@ -1,0 +1,12 @@
+==PROF== Connected to process 784 (/work/.tmp/external_sgemm_compare/sgemm_v2)
+==PROF== Disconnected from process 784
+"ID","Process ID","Process Name","Host Name","Kernel Name","Context","Stream","Block Size","Grid Size","Device","CC","Section Name","Metric Name","Metric Unit","Metric Value"
+"0","784","sgemm_v2","127.0.0.1","sgemm_V2(float *, float *, float *, int, int, int)","1","7","(16, 16, 1)","(32, 32, 1)","0","9.0","Command line profiler metrics","gpu__time_duration.sum","ns","1065120"
+"0","784","sgemm_v2","127.0.0.1","sgemm_V2(float *, float *, float *, int, int, int)","1","7","(16, 16, 1)","(32, 32, 1)","0","9.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum","","31168"
+"0","784","sgemm_v2","127.0.0.1","sgemm_V2(float *, float *, float *, int, int, int)","1","7","(16, 16, 1)","(32, 32, 1)","0","9.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum","","4824453"
+"0","784","sgemm_v2","127.0.0.1","sgemm_V2(float *, float *, float *, int, int, int)","1","7","(16, 16, 1)","(32, 32, 1)","0","9.0","Command line profiler metrics","l1tex__data_pipe_lsu_wavefronts_mem_shared_op_ld.sum","","100694464"
+"0","784","sgemm_v2","127.0.0.1","sgemm_V2(float *, float *, float *, int, int, int)","1","7","(16, 16, 1)","(32, 32, 1)","0","9.0","Command line profiler metrics","l1tex__data_pipe_lsu_wavefronts_mem_shared_op_st.sum","","13213061"
+"0","784","sgemm_v2","127.0.0.1","sgemm_V2(float *, float *, float *, int, int, int)","1","7","(16, 16, 1)","(32, 32, 1)","0","9.0","Command line profiler metrics","launch__occupancy_limit_registers","block","2"
+"0","784","sgemm_v2","127.0.0.1","sgemm_V2(float *, float *, float *, int, int, int)","1","7","(16, 16, 1)","(32, 32, 1)","0","9.0","Command line profiler metrics","launch__occupancy_limit_shared_mem","block","7"
+"0","784","sgemm_v2","127.0.0.1","sgemm_V2(float *, float *, float *, int, int, int)","1","7","(16, 16, 1)","(32, 32, 1)","0","9.0","Command line profiler metrics","launch__registers_per_thread","register/thread","127"
+"0","784","sgemm_v2","127.0.0.1","sgemm_V2(float *, float *, float *, int, int, int)","1","7","(16, 16, 1)","(32, 32, 1)","0","9.0","Command line profiler metrics","launch__waves_per_multiprocessor","","3.88"

@@ -247,3 +247,13 @@ Score summary from `results/optimization_reports/sgemm_v2_20260904/perf.csv`:
 | 4096 | 3.48404 | 39.4481 | 58.9586 | 40.7334 | 0.968x |
 
 On the measured run, SGEMM V2 is close on large shapes but still below the current main GEMM. On `4096x4096x4096`, current main is about `1.03x` faster.
+
+Shared-memory bank conflict snapshot for `4096x4096x4096`, using existing root-collected NCU data:
+
+| Metric | SGEMM V1 | SGEMM V2 | Change |
+|---|---:|---:|---:|
+| shared load bank conflicts | 67,143,197 | 31,168 | -99.9536% |
+| shared store bank conflicts | 792,520 | 4,824,453 | +508.7484% |
+| shared total bank conflicts | 67,935,717 | 4,855,621 | -92.8526% |
+
+Fresh NCU counter collection is currently blocked by `ERR_NVGPUCTRPERM`; the failed permission check is logged in `results/optimization_reports/sgemm_v2_20260904/ncu_permission_check.txt`.
