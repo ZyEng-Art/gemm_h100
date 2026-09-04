@@ -19,6 +19,7 @@ The current kernel is a correctness-first FP32 CUDA core GEMM baseline with shar
 
 ```text
 gemm.cu                  CUDA GEMM kernel + benchmark harness
+sgemm_v2.cu              SGEMM V2 kernel-body snapshot for comparison
 run_gemm_bench.sh        compile and run benchmark
 plot_roofline.py         generate roofline.svg from CSV without matplotlib
 run_gemm_roofline.sh     run CSV benchmark and generate roofline.svg
@@ -205,3 +206,44 @@ Score summary from `results/optimization_reports/b_split_float4_20260904/perf.cs
 The default shapes are all compute-bound under the ideal DRAM roofline model. The current custom kernel reaches about `60.9%` of the measured FP32 CUDA-core peak on `4096x4096x4096`.
 
 Compared with previous commit `5d35995`, the current `4096x4096x4096` score improves from `37.5215` TFLOPS to `40.7334` TFLOPS, a `1.09x` speedup.
+
+## SGEMM V2 Snapshot
+
+`sgemm_v2.cu` is committed as a comparison snapshot. It is a kernel-body fragment, so the committed measurement wraps it with the existing benchmark harness and uses the V2 parameters:
+
+```text
+BM=128, BN=128, BK=8, TM=8, TN=8
+```
+
+Detailed report:
+
+```text
+results/optimization_reports/sgemm_v2_20260904/sgemm_v2_report.md
+```
+
+Build resource usage:
+
+```text
+registers/thread: 127
+shared memory/block: 8192 B
+stack frame: 0 B
+spill stores: 0 B
+spill loads: 0 B
+```
+
+Correctness summary from `results/optimization_reports/sgemm_v2_20260904/benchmark.txt`:
+
+```text
+512/1024/2048/4096: bad_count=0, ok=yes
+```
+
+Score summary from `results/optimization_reports/sgemm_v2_20260904/perf.csv`:
+
+| M=N=K | SGEMM V2 ms | SGEMM V2 TFLOPS | peak % | current main TFLOPS | V2 / current main |
+|---:|---:|---:|---:|---:|---:|
+| 512 | 0.0735744 | 3.64849 | 5.45298 | 4.26847 | 0.855x |
+| 1024 | 0.144406 | 14.8711 | 22.2262 | 17.3075 | 0.859x |
+| 2048 | 0.437907 | 39.2318 | 58.6352 | 40.5117 | 0.968x |
+| 4096 | 3.48404 | 39.4481 | 58.9586 | 40.7334 | 0.968x |
+
+On the measured run, SGEMM V2 is close on large shapes but still below the current main GEMM. On `4096x4096x4096`, current main is about `1.03x` faster.

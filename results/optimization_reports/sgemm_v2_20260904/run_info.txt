@@ -1,0 +1,15 @@
+date: 2026-09-04T15:39:40+08:00
+host: gpu3
+source_fragment: /SharedData/dengzy/kernel/sgemm_v2.cu
+benchmark_wrapper: /SharedData/dengzy/kernel/.tmp/sgemm_v2_20260904/sgemm_v2_bench.cu
+base_commit: 03139ba
+branch: main
+cuda_visible_devices_for_benchmark: 6
+0, NVIDIA H100 80GB HBM3, 0, 75357
+1, NVIDIA H100 80GB HBM3, 0, 4
+2, NVIDIA H100 80GB HBM3, 0, 4
+3, NVIDIA H100 80GB HBM3, 0, 4
+4, NVIDIA H100 80GB HBM3, 0, 6987
+5, NVIDIA H100 80GB HBM3, 0, 6983
+6, NVIDIA H100 80GB HBM3, 0, 0
+7, NVIDIA H100 80GB HBM3, 0, 0
