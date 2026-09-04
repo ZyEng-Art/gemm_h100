@@ -1,0 +1,4 @@
+metric,previous_commit,previous_value,previous_wavefronts,previous_conflict_per_wavefront,current_commit,current_value,current_wavefronts,current_conflict_per_wavefront,delta_current_minus_previous,change_pct,note
+shared_load_bank_conflicts,5d35995,268451537,671104721,0.40001438,03139ba,NA,NA,NA,NA,NA,current B-split GEMM NCU counter collection is blocked by ERR_NVGPUCTRPERM
+shared_store_bank_conflicts,5d35995,481387,34035819,0.01414354,03139ba,NA,NA,NA,NA,NA,current B-split GEMM NCU counter collection is blocked by ERR_NVGPUCTRPERM
+shared_total_bank_conflicts,5d35995,268932924,705140540,0.38138911,03139ba,NA,NA,NA,NA,NA,current B-split GEMM NCU counter collection is blocked by ERR_NVGPUCTRPERM

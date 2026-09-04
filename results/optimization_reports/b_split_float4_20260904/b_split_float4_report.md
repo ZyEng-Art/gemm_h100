@@ -116,6 +116,68 @@ Previous data source: `results/recheck_20260904/current_perf_no_check_gpu6.csv`
 | 2048x2048x2048 | 0.461197 | 0.424072 | 1.09x | 37.2506 | 40.5117 | 1.09x | +4.874 |
 | 4096x4096x4096 | 3.66294 | 3.37411 | 1.09x | 37.5215 | 40.7334 | 1.09x | +4.801 |
 
+## GEMM Shared Memory Bank Conflict
+
+This section is for `gemm.cu` current B-split GEMM versus the previous GEMM commit. It is separate from the `sgemm_v1`/`sgemm_v2` snapshot comparison.
+
+Current GEMM commit:
+
+```text
+03139ba Add B-split float4 GEMM experiment
+```
+
+Previous GEMM commit:
+
+```text
+5d35995 Simplify GEMM K loop
+```
+
+Fresh NCU counter collection for the current B-split GEMM is currently blocked for this user by `ERR_NVGPUCTRPERM`; see `ncu_permission_check.txt`.
+
+Because of that, this report does not claim a measured current-vs-previous shared conflict delta for `03139ba`. The table below records the available previous-version NCU reference and marks the current counter fields as `NA`.
+
+Available previous-version NCU reference:
+
+```text
+source: results/current_diag/head_device1_bank.csv
+copied: shared_conflict_prev_5d35995_4096_bank.csv
+shape: 4096x4096x4096
+kernel: gemm_kernel
+block: (16, 16, 1)
+grid: (32, 32, 1)
+registers/thread: 128
+```
+
+Raw metric names:
+
+```text
+l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum
+l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum
+l1tex__data_pipe_lsu_wavefronts_mem_shared_op_ld.sum
+l1tex__data_pipe_lsu_wavefronts_mem_shared_op_st.sum
+```
+
+| Metric | Previous `5d35995` | Previous wavefronts | Previous conflicts/wavefront | Current `03139ba` | Delta |
+|---|---:|---:|---:|---:|---:|
+| Shared load bank conflicts | 268,451,537 | 671,104,721 | 0.40001438 | NA | NA |
+| Shared store bank conflicts | 481,387 | 34,035,819 | 0.01414354 | NA | NA |
+| Shared total bank conflicts | 268,932,924 | 705,140,540 | 0.38138911 | NA | NA |
+
+Known performance delta for the same current-vs-previous GEMM comparison is still valid and is recorded above. At `4096x4096x4096`, current B-split GEMM improves from `37.5215` TFLOPS to `40.7334` TFLOPS, a `1.09x` speedup.
+
+Command to fill the missing current NCU counters when admin profiling is enabled:
+
+```bash
+CUDA_VISIBLE_DEVICES=7 \
+/usr/local/cuda-12.9/bin/ncu \
+  --metrics l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum,l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum,l1tex__data_pipe_lsu_wavefronts_mem_shared_op_ld.sum,l1tex__data_pipe_lsu_wavefronts_mem_shared_op_st.sum \
+  --target-processes all \
+  --csv --page raw \
+  --kernel-name gemm_kernel \
+  .tmp/b_split_float4_20260904/gemm_bench \
+  --shape 4096x4096x4096 --warmup 1 --repeat 1 --no-check --no-cublas
+```
+
 ## Memcheck
 
 Aligned 512x512x512 memcheck command:
@@ -143,4 +205,8 @@ Raw artifacts in this directory:
 - `benchmark.txt`
 - `perf.csv`
 - `perf_comparison.csv`
+- `shared_conflict_gemm_current_vs_prev.csv`
+- `shared_conflict_prev_5d35995_4096_bank.csv`
+- `perf_prev_5d35995_reference.csv`
+- `ncu_permission_check.txt`
 - `memcheck_512.txt`
