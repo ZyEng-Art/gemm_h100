@@ -1,0 +1,4 @@
+========= COMPUTE-SANITIZER
+M,N,K,custom_ms,custom_tflops,custom_peak_pct,ideal_dram_bytes,ai_flop_per_byte,hbm_tbps,compute_peak_tflops,mem_roof_tflops,roofline_tflops,roofline_bound,custom_roofline_pct,cublas_ms,cublas_tflops,cublas_peak_pct,cublas_roofline_pct,max_abs,max_rel,bad_count,passed
+128,128,32,42.6689,2.45747e-05,3.6729e-05,98304,10.6667,3.35,66.9082,35.7333,35.7333,memory,6.87725e-05,nan,nan,nan,nan,0,0,0,1
+========= RACECHECK SUMMARY: 0 hazards displayed (0 errors, 0 warnings)

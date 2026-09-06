@@ -1,0 +1,5 @@
+M=N=K,current_ms,current_tflops,current_peak_pct,current_passed,sgemm_v3_fixed_ms,sgemm_v3_fixed_tflops,sgemm_v3_fixed_peak_pct,sgemm_v3_fixed_passed,v3_fixed_over_current
+512,0.0645357,4.15949,6.21671,1,0.0508909,5.27473,7.88353,1,1.2681x
+1024,0.125863,17.0621,25.5007,1,0.0998726,21.5022,32.1369,1,1.2602x
+2048,0.451627,38.0399,56.8539,1,0.36318,47.3041,70.7,1,1.2435x
+4096,3.56121,38.5934,57.6811,1,2.8363,48.4571,72.4233,1,1.2556x
