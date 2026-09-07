@@ -1,0 +1,2 @@
+M,N,K,custom_ms,custom_tflops,custom_peak_pct,ideal_dram_bytes,ai_flop_per_byte,hbm_tbps,compute_peak_tflops,mem_roof_tflops,roofline_tflops,roofline_bound,custom_roofline_pct,cublas_ms,cublas_tflops,cublas_peak_pct,cublas_roofline_pct,max_abs,max_rel,bad_count,passed
+512,512,512,0.054688,4.90849,7.33616,3.14573e+06,85.3333,3.35,66.9082,285.867,66.9082,compute,7.33616,0.029088,9.22839,13.7926,13.7926,9.05991e-06,0.0583732,0,1

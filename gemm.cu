@@ -28,196 +28,133 @@
 
 #define BM 128
 #define BN 128
-#define BK 16
+#define BK 8
 
 #define TM 8
 #define TN 8
 
-#define OFFSET(row_offset, col_len, col_offset) (row_offset) * (col_len) + col_offset
+#define OFFSET(row, col, ld) ((row) * (ld) + (col))
 #define FLOAT4(pointer) (reinterpret_cast<float4*>(&(pointer))[0])
 
-#define MOVONCE 4
 // ========================= Optimize this kernel =========================
-__device__ void move_shm_out(float* A,
-                        float * shm,
-                        int start_row,
-                        int start_col,
-                        int bm,
-                        int bn,
-                        int M,
-                        int N) {
-  int num_elements = bm * bn / MOVONCE;
-  int nthreads = blockDim.y * blockDim.x;
-  int tid = threadIdx.y * blockDim.x + threadIdx.x;
-  for(int i = tid; i < num_elements; i += nthreads) {
-    int row = (i << 2) / bn;
-    int col = (i << 2) % bn;
-    FLOAT4(shm[row * bn + col]) = FLOAT4(A[(start_row + row) * N + (start_col + col)]);
-  }
-}
-
-__device__ __forceinline__ void move_shm_in(float* A,
-                        float * shm,
-                        int tid,
-                        int start_row,
-                        int start_col,
-                        int bm,
-                        int bn,
-                        int M,
-                        int N) {
-  int num_elements = bm * bn / 4;
-  int nthreads = blockDim.y * blockDim.x;
-  for(int i = tid; i < num_elements; i += nthreads) {
-    int row = (i << 2) / bn;
-    int col = (i << 2) % bn;
-    uint32_t smem_addr = static_cast<uint32_t>(__cvta_generic_to_shared(shm + row * bn + col));
-    float* src_gemm = A + (start_row + row) * N + (start_col + col);
-    if (start_row + row < M && start_col + col < N)
-        asm volatile(
-        "cp.async.cg.shared.global [%0], [%1], 16;\n"
-        :
-        : "r"(smem_addr), "l"(src_gemm)
-    );
-      // FLOAT4(shm[row * bn + col]) = FLOAT4(A[(start_row + row) * N + (start_col + col)]);
-  }
-}
-
-// __device__ void move_shm_in_T(float* A,
-//                         float * shm,
-//                         int tid,
-//                         int start_row,
-//                         int start_col,
-//                         int bm,
-//                         int bn,
-//                         int M,
-//                         int N) {
-//   int num_elements = bm * bn / 4;
-//   int nthreads = blockDim.y * blockDim.x;
-//   float r_load[4];
-//   for(int i = tid; i < num_elements; i += nthreads) {
-//     int row = (i << 2) / bn;
-//     int col = (i << 2) % bn;
-//     if (start_row + row < M && start_col + col < N) {
-//       FLOAT4(r_load[0]) = FLOAT4(A[(start_row + row) * N + (start_col + col)]);
-//       shm[col * bm + row] = r_load[0];
-//       shm[(col+1) * bm + row] = r_load[1];
-//       shm[(col+2) * bm + row] = r_load[2];
-//       shm[(col+3) * bm + row] = r_load[3];
-//     }
-//   }
-// }
-// 因为一个线程的寄存器本身对不同元素就是可以共享的，
-// 因此可以不用像共享内存一样显示把小tile 放到寄存器中
-// 本来共享内存同一个迭代步k 同一行访问同一个元素，
-// 因为hbm对不同线程无法共享，使用共享内存共享
-// 现在这个线程的同一行的元素的结果直接访问共享内存这个迭代步的值即可
-// 所以这边寄存器层次对K 的划分TK 是没必要的
 __global__ void gemm_kernel(float* A,
                             float* B,
                             float* C,
                             int M,
                             int N,
                             int K) {
-    __shared__ float shm_A[2][BM * BK];
-    __shared__ float shm_B[2][BK * BN];
-    int block_row_start = blockIdx.y * BM;
-    int block_col_start = blockIdx.x * BN;
+    const int bx = blockIdx.x;
+    const int by = blockIdx.y;
+    const int tx = threadIdx.x;
+    const int ty = threadIdx.y;
+    const int tid = ty * blockDim.x + tx;
 
-    int row_start = block_row_start + threadIdx.y * TM;
-    int col_start = block_col_start + threadIdx.x * TN / 2;
-    int tid = threadIdx.y * blockDim.x + threadIdx.x;
-    float tmp_c[TM][TN] = {0.0};
-    int buffer_id = 0;
-    move_shm_in(A, shm_A[0], tid, blockIdx.y * BM, 0 * BK, BM, BK, M, K);
-    move_shm_in(B, shm_B[0], tid, 0 * BK, blockIdx.x * BN, BK, BN, K, N);
-    asm volatile(
-      "cp.async.commit_group;"
-    );
-    __syncthreads();
-    buffer_id = 1 - buffer_id;
-    for (int bk = 1; bk < (K + BK - 1) / BK; bk++){
-      move_shm_in(A, shm_A[buffer_id], tid, blockIdx.y * BM, bk * BK, BM, BK, M, K);
-      move_shm_in(B, shm_B[buffer_id], tid, bk * BK, blockIdx.x * BN, BK, BN, K, N);
-      asm volatile(
-        "cp.async.commit_group;"
-      );
+    __shared__ float s_a[2][BK][BM];
+    __shared__ float s_b[2][BK][BN];
 
-      // 协作搬运
-      asm volatile(
-        "cp.async.wait_group 1;"
-      );
-      __syncthreads();
+    float r_load_a[4];
+    float r_load_b[4];
+    float r_comp_a[TM];
+    float r_comp_b[TN];
+    float r_c[TM][TN] = {0.0f};
 
-      // 实现这个shm tile 的乘法,分成一些register tile的乘法
-      #pragma unroll
-      for(int i = 0; i < BK; i ++) {
-       #pragma unroll
-       for(int tm = 0; tm < TM; tm++) {
-        #pragma unroll
-        for(int tn = 0; tn < TN / 2; tn+=4) {
-            float r_b0[4];
-            float r_b1[4];
-            FLOAT4(r_b0[0]) = FLOAT4(shm_B[1 - buffer_id][(i) * BN + threadIdx.x * TN / 2 + tn + BN / 2]);
-            FLOAT4(r_b1[0]) = FLOAT4(shm_B[1 - buffer_id][(i) * BN + threadIdx.x * TN / 2 + tn]);
-            for(int k = 0; k < 4; k++) {
-              tmp_c[tm][tn + k] += shm_A[1 - buffer_id][(threadIdx.y * TM + tm) * BK + i]
-              * r_b1[k];
-              tmp_c[tm][tn + k + TN / 2] += shm_A[1 - buffer_id][(threadIdx.y * TM + tm) * BK + i]
-              * r_b0[k];
-            }
-        }
-       }
-      }
+    const int load_a_smem_m = tid >> 1;
+    const int load_a_smem_k = (tid & 1) << 2;
+    const int load_b_smem_k = tid >> 5;
+    const int load_b_smem_n = (tid & 31) << 2;
 
+    const int load_a_gmem_m = by * BM + load_a_smem_m;
+    const int load_b_gmem_n = bx * BN + load_b_smem_n;
 
-      buffer_id = 1 - buffer_id;
-      __syncthreads();
+    {
+        const int load_a_gmem_k = load_a_smem_k;
+        const int load_a_gmem_addr = OFFSET(load_a_gmem_m, load_a_gmem_k, K);
+        const int load_b_gmem_k = load_b_smem_k;
+        const int load_b_gmem_addr = OFFSET(load_b_gmem_k, load_b_gmem_n, N);
 
-      // #pragma unroll
-      // for(int i = 0; i < BK; i ++) {
-      //  #pragma unroll
-      //  for(int tm = 0; tm < TM; tm++) {
-      //   #pragma unroll
-      //   for(int tn = 0; tn < TN / 2; tn++) {
+        FLOAT4(r_load_a[0]) = FLOAT4(A[load_a_gmem_addr]);
+        FLOAT4(r_load_b[0]) = FLOAT4(B[load_b_gmem_addr]);
 
-      //   }
-      //  }
-      // }
-
+        s_a[0][load_a_smem_k    ][load_a_smem_m] = r_load_a[0];
+        s_a[0][load_a_smem_k + 1][load_a_smem_m] = r_load_a[1];
+        s_a[0][load_a_smem_k + 2][load_a_smem_m] = r_load_a[2];
+        s_a[0][load_a_smem_k + 3][load_a_smem_m] = r_load_a[3];
+        FLOAT4(s_b[0][load_b_smem_k][load_b_smem_n]) = FLOAT4(r_load_b[0]);
     }
-      asm volatile(
-        "cp.async.wait_group 0;"
-      );
-      __syncthreads();
 
-    // last buffer calculate
-     #pragma unroll
-      for(int i = 0; i < BK; i ++) {
-       #pragma unroll
-       for(int tm = 0; tm < TM; tm++) {
+    __syncthreads();
+
+    for (int bk = 1; bk < (K + BK - 1) / BK; bk++) {
+        const int smem_sel = (bk - 1) & 1;
+        const int smem_sel_next = bk & 1;
+
+        const int load_a_gmem_k = bk * BK + load_a_smem_k;
+        const int load_a_gmem_addr = OFFSET(load_a_gmem_m, load_a_gmem_k, K);
+        const int load_b_gmem_k = bk * BK + load_b_smem_k;
+        const int load_b_gmem_addr = OFFSET(load_b_gmem_k, load_b_gmem_n, N);
+
+        FLOAT4(r_load_a[0]) = FLOAT4(A[load_a_gmem_addr]);
+        FLOAT4(r_load_b[0]) = FLOAT4(B[load_b_gmem_addr]);
+
         #pragma unroll
-        for(int tn = 0; tn < TN / 2; tn+=4) {
-            float r_b0[4];
-            float r_b1[4];
-            FLOAT4(r_b0[0]) = FLOAT4(shm_B[1 - buffer_id][(i) * BN + threadIdx.x * TN / 2 + tn + BN / 2]);
-            FLOAT4(r_b1[0]) = FLOAT4(shm_B[1 - buffer_id][(i) * BN + threadIdx.x * TN / 2 + tn]);
-            for(int k = 0; k < 4; k++) {
-              tmp_c[tm][tn + k] += shm_A[1 - buffer_id][(threadIdx.y * TM + tm) * BK + i]
-              * r_b1[k];
-              tmp_c[tm][tn + k + TN / 2] += shm_A[1 - buffer_id][(threadIdx.y * TM + tm) * BK + i]
-              * r_b0[k];
+        for (int tk = 0; tk < BK; tk++) {
+            FLOAT4(r_comp_a[0]) = FLOAT4(s_a[smem_sel][tk][ty * TM / 2]);
+            FLOAT4(r_comp_a[4]) = FLOAT4(s_a[smem_sel][tk][ty * TM / 2 + BM / 2]);
+            FLOAT4(r_comp_b[0]) = FLOAT4(s_b[smem_sel][tk][tx * TN / 2]);
+            FLOAT4(r_comp_b[4]) = FLOAT4(s_b[smem_sel][tk][tx * TN / 2 + BN / 2]);
+
+            #pragma unroll
+            for (int tm = 0; tm < TM; tm++) {
+                #pragma unroll
+                for (int tn = 0; tn < TN; tn++) {
+                    r_c[tm][tn] += r_comp_a[tm] * r_comp_b[tn];
+                }
             }
         }
-       }
-      }
 
-    for(int i = 0; i < TM; i++) {
-      for(int j = 0; j < TN / 2; j+=4) {
-        if (row_start + i < M && col_start + j < N)
-          FLOAT4(C[(row_start + i)* N + col_start + j]) = FLOAT4(tmp_c[i][j]);
-        if (row_start + i < M && col_start + j + BN / 2 < N)
-          FLOAT4(C[(row_start + i)* N + col_start + j + BN / 2]) = FLOAT4(tmp_c[i][j + TN / 2]);
-      }
+        s_a[smem_sel_next][load_a_smem_k    ][load_a_smem_m] = r_load_a[0];
+        s_a[smem_sel_next][load_a_smem_k + 1][load_a_smem_m] = r_load_a[1];
+        s_a[smem_sel_next][load_a_smem_k + 2][load_a_smem_m] = r_load_a[2];
+        s_a[smem_sel_next][load_a_smem_k + 3][load_a_smem_m] = r_load_a[3];
+        FLOAT4(s_b[smem_sel_next][load_b_smem_k][load_b_smem_n]) = FLOAT4(r_load_b[0]);
+
+        __syncthreads();
+    }
+
+    const int smem_sel_last = (((K + BK - 1) / BK) - 1) & 1;
+
+    #pragma unroll
+    for (int tk = 0; tk < BK; tk++) {
+        FLOAT4(r_comp_a[0]) = FLOAT4(s_a[smem_sel_last][tk][ty * TM / 2]);
+        FLOAT4(r_comp_a[4]) = FLOAT4(s_a[smem_sel_last][tk][ty * TM / 2 + BM / 2]);
+        FLOAT4(r_comp_b[0]) = FLOAT4(s_b[smem_sel_last][tk][tx * TN / 2]);
+        FLOAT4(r_comp_b[4]) = FLOAT4(s_b[smem_sel_last][tk][tx * TN / 2 + BN / 2]);
+
+        #pragma unroll
+        for (int tm = 0; tm < TM; tm++) {
+            #pragma unroll
+            for (int tn = 0; tn < TN; tn++) {
+                r_c[tm][tn] += r_comp_a[tm] * r_comp_b[tn];
+            }
+        }
+    }
+
+    #pragma unroll
+    for (int i = 0; i < TM / 2; i++) {
+        const int store_c_gmem_m = by * BM + ty * TM / 2 + i;
+        const int store_c_gmem_n = bx * BN + tx * TN / 2;
+        const int store_c_gmem_addr = OFFSET(store_c_gmem_m, store_c_gmem_n, N);
+        FLOAT4(C[store_c_gmem_addr]) = FLOAT4(r_c[i][0]);
+        FLOAT4(C[store_c_gmem_addr + BN / 2]) = FLOAT4(r_c[i][4]);
+    }
+
+    #pragma unroll
+    for (int i = 0; i < TM / 2; i++) {
+        const int store_c_gmem_m = by * BM + BM / 2 + ty * TM / 2 + i;
+        const int store_c_gmem_n = bx * BN + tx * TN / 2;
+        const int store_c_gmem_addr = OFFSET(store_c_gmem_m, store_c_gmem_n, N);
+        FLOAT4(C[store_c_gmem_addr]) = FLOAT4(r_c[i + TM / 2][0]);
+        FLOAT4(C[store_c_gmem_addr + BN / 2]) = FLOAT4(r_c[i + TM / 2][4]);
     }
 
 }

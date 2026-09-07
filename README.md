@@ -49,32 +49,40 @@ __global__ void gemm_kernel(const float* A,
 
 ## Current Optimization Content
 
-The current kernel is a CUDA-core FP32 shared-memory tiled GEMM:
+The current kernel is a CUDA-core FP32 shared-memory tiled GEMM using the
+v3-style register-prefetch software pipeline:
 
-- `BM=128`, `BN=128`, `BK=32`
+- `BM=128`, `BN=128`, `BK=8`
 - `TM=8`, `TN=8`
 - one CUDA block computes one `128 x 128` tile of C
 - one thread computes an `8 x 8` register accumulator tile
-- A and B tiles are staged through shared memory
-- global/shared C paths use `float4` vectorized loads or stores on aligned benchmark shapes
-- each thread maps its 8 output columns as two 4-column groups separated by `BN/2`
+- A is stored in shared memory as `s_a[2][BK][BM]`, so the compute path reads an A column as contiguous shared-memory data
+- B is stored in shared memory as `s_b[2][BK][BN]`
+- global loads use `float4` vectorized loads on aligned benchmark shapes
+- the next K tile is prefetched into registers before computing the current shared-memory tile
+- after the current tile compute, the prefetched register data is written into the alternate shared-memory buffer
 
-This is not Tensor Core code. It uses normal CUDA-core FP32 FMA.
+This is not Tensor Core code. It uses normal CUDA-core FP32 FMA. The current
+implementation intentionally does not use `cp.async`; the software pipeline is
+implemented with register prefetch plus shared-memory double buffering.
 
-Current caveat: this is an aligned-shape fast path. Default committed results use `512/1024/2048/4096`, so the `float4` accesses are aligned and correctness passes. For arbitrary non-multiple shapes, add scalar/masked tails and complete boundary checks before relying on correctness.
+Current caveat: this is an aligned-shape fast path. Default committed results
+use `512/1024/2048/4096`, so the `float4` accesses are aligned and correctness
+passes. For arbitrary non-multiple shapes, add scalar/masked tails and complete
+boundary checks before relying on correctness.
 
 Latest detailed optimization report:
 
 ```text
-results/optimization_reports/b_split_float4_20260904/b_split_float4_report.md
+results/optimization_reports/v3style_software_pipeline_20260907/v3style_software_pipeline_report.md
 ```
 
 Expected next optimization directions:
 
-- move B `float4` loads out of the `tm` loop so each K-step B vector is reused across all 8 rows
-- investigate remaining shared-memory bank conflicts with Nsight Compute when GPU counters are available
-- tune the A shared-memory layout separately from the B split
-- compare register pressure and occupancy after each mapping change
+- inspect whether the current B shared-memory access pattern can be reduced further without increasing instruction count
+- compare the register-prefetch software pipeline against a carefully scheduled `cp.async` pipeline with the same shared-memory layout
+- keep `ptxas` register count under the 128-register occupancy cliff for this thread/block shape
+- add a separate masked-tail kernel or scalar fallback if arbitrary shapes are required
 - optional TF32/FP16/BF16 Tensor Core implementation if changing the datatype/precision target
 
 ## Run
@@ -157,13 +165,15 @@ Override with:
 Committed result files:
 
 ```text
-results/optimization_reports/b_split_float4_20260904/run_info.txt
-results/optimization_reports/b_split_float4_20260904/build.log
-results/optimization_reports/b_split_float4_20260904/benchmark.txt
-results/optimization_reports/b_split_float4_20260904/perf.csv
-results/optimization_reports/b_split_float4_20260904/perf_comparison.csv
-results/optimization_reports/b_split_float4_20260904/memcheck_512.txt
-results/optimization_reports/b_split_float4_20260904/b_split_float4_report.md
+results/optimization_reports/v3style_software_pipeline_20260907/build.log
+results/optimization_reports/v3style_software_pipeline_20260907/perf_gpu7_nocheck.csv
+results/optimization_reports/v3style_software_pipeline_20260907/correctness_default_sizes.csv
+results/optimization_reports/v3style_software_pipeline_20260907/run_script_sh_smoke.csv
+results/optimization_reports/v3style_software_pipeline_20260907/prev_cpasync_perf_gpu7.csv
+results/optimization_reports/v3style_software_pipeline_20260907/v3style_perf_gpu7.csv
+results/optimization_reports/v3style_software_pipeline_20260907/prev_cpasync_4096_details.txt
+results/optimization_reports/v3style_software_pipeline_20260907/v3style_4096_details.txt
+results/optimization_reports/v3style_software_pipeline_20260907/v3style_software_pipeline_report.md
 ```
 
 Benchmark environment:
@@ -174,50 +184,61 @@ SM count: 132
 SM clock: 1980.0 MHz
 FP32 CUDA core peak used: 66.908 TFLOPS
 HBM bandwidth used for roofline: 3.350 TB/s
-Timing: warmup=5, repeat=20
-cuBLAS reference: fp32_pedantic
+Timing: warmup/repeat varies by artifact and is recorded in each CSV
+cuBLAS reference: fp32_pedantic when correctness checking is enabled
 ```
 
 Build resource usage:
 
 ```text
-registers/thread: 128
-shared memory/block: 32768 B
+registers/thread: 127
+shared memory/block: 16384 B
 stack frame: 0 B
 spill stores: 0 B
 spill loads: 0 B
 ```
 
-Correctness summary from `results/optimization_reports/b_split_float4_20260904/benchmark.txt`:
+Correctness summary from
+`results/optimization_reports/v3style_software_pipeline_20260907/correctness_default_sizes.csv`:
 
 ```text
-512/1024/2048/4096: bad_count=0, ok=yes
+512/1024/2048/4096: bad_count=0, passed=1
 ```
 
-Score summary from `results/optimization_reports/b_split_float4_20260904/perf.csv` and `results/optimization_reports/b_split_float4_20260904/benchmark.txt`:
+Score summary from
+`results/optimization_reports/v3style_software_pipeline_20260907/perf_gpu7_nocheck.csv`:
 
-| M=N=K | custom ms | custom TFLOPS | peak % | AI | roofline bound | roof % | cuBLAS TFLOPS | ok |
-|---:|---:|---:|---:|---:|---|---:|---:|:--|
-| 512 | 0.062888 | 4.26847 | 6.37959 | 85.333 | compute | 6.37959 | 18.310 | yes |
-| 1024 | 0.124078 | 17.3075 | 25.8675 | 170.667 | compute | 25.8675 | 38.013 | yes |
-| 2048 | 0.424072 | 40.5117 | 60.5482 | 341.333 | compute | 60.5482 | 50.759 | yes |
-| 4096 | 3.37411 | 40.7334 | 60.8796 | 682.667 | compute | 60.8796 | 52.084 | yes |
+| M=N=K | custom ms | custom TFLOPS | peak % | AI | roofline bound | roof % | ok |
+|---:|---:|---:|---:|---:|---|---:|:--|
+| 512 | 0.050878 | 5.27602 | 7.88547 | 85.333 | compute | 7.88547 | yes |
+| 1024 | 0.099827 | 21.5120 | 32.1515 | 170.667 | compute | 32.1515 | yes |
+| 2048 | 0.363261 | 47.2934 | 70.6841 | 341.333 | compute | 70.6841 | yes |
+| 4096 | 2.83845 | 48.4204 | 72.3684 | 682.667 | compute | 72.3684 | yes |
 
-The default shapes are all compute-bound under the ideal DRAM roofline model. The current custom kernel reaches about `60.9%` of the measured FP32 CUDA-core peak on `4096x4096x4096`.
+The default shapes are all compute-bound under the ideal DRAM roofline model.
+The current custom kernel reaches about `72.4%` of the measured FP32 CUDA-core
+peak on `4096x4096x4096`.
 
-Compared with previous commit `5d35995`, the current `4096x4096x4096` score improves from `37.5215` TFLOPS to `40.7334` TFLOPS, a `1.09x` speedup.
+Compared with the previous cp.async double-buffer implementation measured in
+the same reference run, the current `4096x4096x4096` score improves from
+`38.3056` TFLOPS to `48.1134` TFLOPS, a `1.256x` speedup.
 
-Shared-memory bank conflict status for current `gemm.cu` versus previous `5d35995`, collected with NCU inside Docker so hardware counters are available:
+NCU scheduler comparison on `4096x4096x4096`, collected inside Docker:
 
-```text
-results/optimization_reports/b_split_float4_20260904/shared_conflict_gemm_current_vs_prev.csv
-```
+| Metric | Previous cp.async | Current v3-style |
+|---|---:|---:|
+| Compute (SM) Throughput | 69.68% | 80.19% |
+| Memory Throughput | 46.01% | 72.13% |
+| L1/TEX Cache Throughput | 47.49% | 74.45% |
+| No Eligible | 28.09% | 17.22% |
+| Issued Warp Per Scheduler | 0.72 | 0.83 |
+| Eligible Warps Per Scheduler | 2.36 | 2.55 |
+| Achieved Occupancy | 24.06% | 23.93% |
+| Executed Instructions | 2.614B | 2.396B |
 
-| Metric | Previous `5d35995` | Previous conflicts/wavefront | Current `03139ba` | Current conflicts/wavefront | Delta |
-|---|---:|---:|---:|---:|---:|
-| shared load bank conflicts | 268,449,772 | 0.40001280 | 73,183 | 0.00018172 | -99.9727% |
-| shared store bank conflicts | 823,271 | 0.02394782 | 786,535 | 0.02290369 | -4.4622% |
-| shared total bank conflicts | 269,273,043 | 0.38168735 | 859,718 | 0.00196701 | -99.6807% |
+The previous cp.async implementation does generate `LDGSTS`/`DEPBAR`, but the
+current software-pipelined version has fewer no-eligible scheduler cycles and
+higher issue utilization.
 
 Both profiled binaries use `128` registers/thread and `32768 B` static shared memory/block (`33792 B` allocated). The raw NCU files are `shared_conflict_prev_5d35995_4096_bank.csv` and `shared_conflict_current_03139ba_4096_bank.csv`; the earlier non-Docker permission failure remains logged in `ncu_permission_check.txt`.
 
