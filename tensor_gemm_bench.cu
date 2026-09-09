@@ -47,7 +47,7 @@
 #endif
 
 #ifndef USER_TENSOR_GEMM_TF32_READY
-#define USER_TENSOR_GEMM_TF32_READY 0
+#define USER_TENSOR_GEMM_TF32_READY 1
 #endif
 
 #ifndef USER_TENSOR_GEMM_TILE_M
@@ -157,16 +157,31 @@ __global__ void tensor_gemm_kernel_tf32(const float* A,
                                         int N,
                                         int K) {
 #if USER_TENSOR_GEMM_TF32_READY
-  // TODO: implement TF32 Tensor Core GEMM here.
-  //
-  // WMMA TF32 usually uses float storage with TF32 multiply precision. Match
-  // cuBLAS FAST_TF32 behavior, not FP32 pedantic correctness.
-  (void)A;
-  (void)B;
-  (void)C;
-  (void)M;
-  (void)N;
-  (void)K;
+  using namespace nvcuda;
+
+  constexpr int WMMA_M = 16;
+  constexpr int WMMA_N = 16;
+  constexpr int WMMA_K = 8;
+
+  int row_num = M / WMMA_M;
+  int col_num = N / WMMA_N;
+
+  size_t warp_id = (threadIdx.x) >> 5;
+  size_t row_id = blockIdx.y * blockDim.y * WMMA_M;
+  size_t col_id = blockIdx.x * blockDim.x * WMMA_N / 32 + warp_id * WMMA_N;
+
+  wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
+  wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, wmma::precision::tf32, wmma::row_major> a_frag;
+  wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, wmma::precision::tf32, wmma::row_major> b_frag;
+
+  wmma::fill_fragment(c_frag, 0.0f);
+  for(int k = 0; k < K; k += WMMA_K) {
+    wmma::load_matrix_sync(a_frag, A + row_id * K + k, K);
+    wmma::load_matrix_sync(b_frag, B + k * N + col_id, N);
+    wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+  }
+
+  wmma::store_matrix_sync(C + row_id * N + col_id, c_frag, N, wmma::mem_row_major);
 #else
   (void)A;
   (void)B;
@@ -547,10 +562,12 @@ static void validate_shape(const Problem& p, const Config& cfg) {
   if (cfg.allow_nonmultiple) {
     return;
   }
-  constexpr int multiple = 16;
-  if ((p.M % multiple) || (p.N % multiple) || (p.K % multiple)) {
+  const int mn_multiple = 16;
+  const int k_multiple = (cfg.dtype == BenchDtype::kTf32) ? 8 : 16;
+  if ((p.M % mn_multiple) || (p.N % mn_multiple) || (p.K % k_multiple)) {
     std::ostringstream oss;
-    oss << "Tensor Core fast path requires M/N/K multiples of " << multiple
+    oss << "Tensor Core fast path requires M/N multiples of " << mn_multiple
+        << " and K multiple of " << k_multiple
         << ". Got " << p.M << "x" << p.N << "x" << p.K
         << ". Use --allow-nonmultiple only after adding tail handling.";
     throw std::runtime_error(oss.str());
