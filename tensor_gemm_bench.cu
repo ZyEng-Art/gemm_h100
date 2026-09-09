@@ -59,26 +59,31 @@
 #endif
 
 #ifndef USER_TENSOR_GEMM_TILE_K
-#define USER_TENSOR_GEMM_TILE_K 16
+#define USER_TENSOR_GEMM_TILE_K 32
 #endif
 
 #ifndef USER_TENSOR_GEMM_WARPS_PER_BLOCK
 #define USER_TENSOR_GEMM_WARPS_PER_BLOCK 4
 #endif
 
+#ifndef USER_TENSOR_GEMM_TF32_WARPS_M
+#define USER_TENSOR_GEMM_TF32_WARPS_M 4
+#endif
+
+#ifndef USER_TENSOR_GEMM_TF32_WARPS_N
+#define USER_TENSOR_GEMM_TF32_WARPS_N 4
+#endif
+
 // ========================= User kernel interface =========================
 //
-// Default launch mapping:
-//   blockDim.x = USER_TENSOR_GEMM_WARPS_PER_BLOCK * 32
-//   grid.x = ceil(N / (USER_TENSOR_GEMM_TILE_N * WARPS_PER_BLOCK))
-//   grid.y = ceil(M / USER_TENSOR_GEMM_TILE_M)
+// The current TF32 implementation uses a shared-memory block tile:
+//   blockDim.x = USER_TENSOR_GEMM_TF32_WARPS_M *
+//                USER_TENSOR_GEMM_TF32_WARPS_N * 32
+//   grid.x = ceil(N / (16 * USER_TENSOR_GEMM_TF32_WARPS_N))
+//   grid.y = ceil(M / (16 * USER_TENSOR_GEMM_TF32_WARPS_M))
 //
-// This mapping is convenient for a first WMMA implementation:
-//   int warp_id = threadIdx.x >> 5;
-//   int tile_m = blockIdx.y;
-//   int tile_n = blockIdx.x * USER_TENSOR_GEMM_WARPS_PER_BLOCK + warp_id;
-//   int row = tile_m * USER_TENSOR_GEMM_TILE_M;
-//   int col = tile_n * USER_TENSOR_GEMM_TILE_N;
+// Within each block, one warp computes one 16x16 C tile. The block
+// cooperatively stages A and B tiles into shared memory before WMMA loads.
 //
 // If you implement a different tiling, change the launch_custom_* wrapper
 // below together with your kernel.
@@ -162,26 +167,80 @@ __global__ void tensor_gemm_kernel_tf32(const float* A,
   constexpr int WMMA_M = 16;
   constexpr int WMMA_N = 16;
   constexpr int WMMA_K = 8;
+  constexpr int WARPS_M = USER_TENSOR_GEMM_TF32_WARPS_M;
+  constexpr int WARPS_N = USER_TENSOR_GEMM_TF32_WARPS_N;
+  constexpr int BLOCK_M = WMMA_M * WARPS_M;
+  constexpr int BLOCK_K = USER_TENSOR_GEMM_TILE_K;
+  constexpr int BLOCK_N = WMMA_N * WARPS_N;
+  constexpr int VEC_FLOATS = 4;
 
-  int row_num = M / WMMA_M;
-  int col_num = N / WMMA_N;
+  static_assert(BLOCK_K % WMMA_K == 0,
+                "USER_TENSOR_GEMM_TILE_K must be a multiple of WMMA_K");
+  static_assert(BLOCK_K % VEC_FLOATS == 0,
+                "USER_TENSOR_GEMM_TILE_K must support float4 copies");
+  static_assert(BLOCK_N % VEC_FLOATS == 0,
+                "BLOCK_N must support float4 copies");
+  static_assert(WARPS_M > 0 && WARPS_N > 0,
+                "TF32 warp tile dimensions must be positive");
+  static_assert(WARPS_M * WARPS_N * 32 <= 1024,
+                "TF32 block must not exceed the CUDA thread-block limit");
 
-  size_t warp_id = (threadIdx.x) >> 5;
-  size_t row_id = blockIdx.y * blockDim.y * WMMA_M;
-  size_t col_id = blockIdx.x * blockDim.x * WMMA_N / 32 + warp_id * WMMA_N;
+  const int warp_id = threadIdx.x >> 5;
+  const int warp_m = warp_id / WARPS_N;
+  const int warp_n = warp_id % WARPS_N;
+  const int block_row = blockIdx.y * BLOCK_M;
+  const int row_id = block_row + warp_m * WMMA_M;
+  const int block_col = blockIdx.x * BLOCK_N;
+  const int col_id = block_col + warp_n * WMMA_N;
+
+  __shared__ __align__(16) float s_a[BLOCK_M][BLOCK_K];
+  __shared__ __align__(16) float s_b[BLOCK_K][BLOCK_N];
 
   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
   wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, wmma::precision::tf32, wmma::row_major> a_frag;
   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, wmma::precision::tf32, wmma::row_major> b_frag;
 
   wmma::fill_fragment(c_frag, 0.0f);
-  for(int k = 0; k < K; k += WMMA_K) {
-    wmma::load_matrix_sync(a_frag, A + row_id * K + k, K);
-    wmma::load_matrix_sync(b_frag, B + k * N + col_id, N);
-    wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+
+  for (int k0 = 0; k0 < K; k0 += BLOCK_K) {
+    constexpr int A_VEC_COUNT = BLOCK_M * BLOCK_K / VEC_FLOATS;
+    constexpr int B_VEC_COUNT = BLOCK_K * BLOCK_N / VEC_FLOATS;
+
+    for (int vec = threadIdx.x; vec < A_VEC_COUNT; vec += blockDim.x) {
+      const int row = vec / (BLOCK_K / VEC_FLOATS);
+      const int col = (vec % (BLOCK_K / VEC_FLOATS)) * VEC_FLOATS;
+      const int global_row = block_row + row;
+      const int global_col = k0 + col;
+      *reinterpret_cast<float4*>(&s_a[row][col]) =
+          *reinterpret_cast<const float4*>(
+              A + static_cast<std::int64_t>(global_row) * K + global_col);
+    }
+
+    for (int vec = threadIdx.x; vec < B_VEC_COUNT; vec += blockDim.x) {
+      const int row = vec / (BLOCK_N / VEC_FLOATS);
+      const int col = (vec % (BLOCK_N / VEC_FLOATS)) * VEC_FLOATS;
+      const int global_row = k0 + row;
+      const int global_col = block_col + col;
+      *reinterpret_cast<float4*>(&s_b[row][col]) =
+          *reinterpret_cast<const float4*>(
+              B + static_cast<std::int64_t>(global_row) * N + global_col);
+    }
+
+    __syncthreads();
+
+    for (int kk = 0; kk < BLOCK_K; kk += WMMA_K) {
+      wmma::load_matrix_sync(a_frag, &s_a[warp_m * WMMA_M][kk], BLOCK_K);
+      wmma::load_matrix_sync(b_frag, &s_b[kk][warp_n * WMMA_N], BLOCK_N);
+      wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+    }
+
+    __syncthreads();
   }
 
-  wmma::store_matrix_sync(C + row_id * N + col_id, c_frag, N, wmma::mem_row_major);
+  wmma::store_matrix_sync(C + static_cast<std::int64_t>(row_id) * N + col_id,
+                          c_frag,
+                          N,
+                          wmma::mem_row_major);
 #else
   (void)A;
   (void)B;
@@ -226,10 +285,16 @@ static void launch_custom_tf32(const float* d_A,
                                const float* d_B,
                                float* d_C,
                                const Problem& p) {
-  dim3 block(USER_TENSOR_GEMM_WARPS_PER_BLOCK * 32);
-  dim3 grid(ceil_div(p.N, USER_TENSOR_GEMM_TILE_N *
-                              USER_TENSOR_GEMM_WARPS_PER_BLOCK),
-            ceil_div(p.M, USER_TENSOR_GEMM_TILE_M));
+  constexpr int wmma_m = 16;
+  constexpr int wmma_n = 16;
+  constexpr int warps_m = USER_TENSOR_GEMM_TF32_WARPS_M;
+  constexpr int warps_n = USER_TENSOR_GEMM_TF32_WARPS_N;
+  constexpr int block_m = wmma_m * warps_m;
+  constexpr int block_n = wmma_n * warps_n;
+  constexpr int warps_per_block = warps_m * warps_n;
+
+  dim3 block(warps_per_block * 32);
+  dim3 grid(ceil_div(p.N, block_n), ceil_div(p.M, block_m));
   tensor_gemm_kernel_tf32<<<grid, block>>>(d_A, d_B, d_C, p.M, p.N, p.K);
 }
 
@@ -479,7 +544,7 @@ static void print_help(const char* argv0) {
       << "  --atol X                 Absolute tolerance, dtype-specific default\n"
       << "  --rtol X                 Relative tolerance, dtype-specific default\n"
       << "  --allow-stub             Permit timing the zero-fill stub kernel\n"
-      << "  --allow-nonmultiple      Do not require M/N/K multiples of 16\n"
+      << "  --allow-nonmultiple      Do not require fast-path tile multiples\n"
       << "  --no-check               Skip cuBLAS correctness check\n"
       << "  --no-cublas              Skip timed cuBLAS baseline\n"
       << "  --csv                    Print CSV rows to stdout; hardware info to stderr\n"
@@ -562,8 +627,8 @@ static void validate_shape(const Problem& p, const Config& cfg) {
   if (cfg.allow_nonmultiple) {
     return;
   }
-  const int mn_multiple = 16;
-  const int k_multiple = (cfg.dtype == BenchDtype::kTf32) ? 8 : 16;
+  const int mn_multiple = (cfg.dtype == BenchDtype::kTf32) ? 64 : 16;
+  const int k_multiple = (cfg.dtype == BenchDtype::kTf32) ? 32 : 16;
   if ((p.M % mn_multiple) || (p.N % mn_multiple) || (p.K % k_multiple)) {
     std::ostringstream oss;
     oss << "Tensor Core fast path requires M/N multiples of " << mn_multiple

@@ -1,0 +1,73 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z23tensor_gemm_kernel_tf32PKfS0_Pfiii' for 'sm_90'
+ptxas info    : Function properties for _Z23tensor_gemm_kernel_tf32PKfS0_Pfiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16384 bytes smem
+ptxas info    : Compile time = 10.567 ms
+ptxas info    : Compiling entry function '_Z23tensor_gemm_kernel_bf16PK13__nv_bfloat16S1_Pfiii' for 'sm_90'
+ptxas info    : Function properties for _Z23tensor_gemm_kernel_bf16PK13__nv_bfloat16S1_Pfiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers
+ptxas info    : Compile time = 6.581 ms
+ptxas info    : Compiling entry function '_Z23tensor_gemm_kernel_fp16PK6__halfS1_Pfiii' for 'sm_90'
+ptxas info    : Function properties for _Z23tensor_gemm_kernel_fp16PK6__halfS1_Pfiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers
+ptxas info    : Compile time = 6.460 ms
+Hardware:
+  device: 0
+  name: NVIDIA H100 80GB HBM3
+  compute capability: 9.0
+  SM count: 132
+  warp size: 32
+  max threads per SM: 2048
+  max threads per block: 1024
+  SM clock: 1980.0 MHz
+  memory clock: 2619.0 MHz
+  global memory: 79.18 GiB
+  memory bus width: 5120 bit
+  L2 cache: 51200.0 KiB
+  shared memory per block: 48.0 KiB
+  shared memory per block opt-in: 227.0 KiB
+  shared memory per SM: 228.0 KiB
+  registers per block: 65536
+  registers per SM: 65536
+  benchmark dtype: tf32
+  theoretical Tensor Core dense peak used: 494.700 TFLOPS
+  HBM bandwidth used for roofline: 3.350 TB/s
+  custom kernel ready: yes
+Benchmark config:
+  warmup: 5
+  repeat: 20
+  check: yes
+  cuBLAS timing: yes
+  atol: 0.500
+  rtol: 0.050
+
+Problem: 512x512x512
+  dtype: tf32
+  custom: 0.045234 ms, 5.9344 TFLOPS, 1.1996% peak
+  roofline: AI=85.333 FLOP/B, mem_roof=285.867 TFLOPS, bound=memory, custom_roof=2.076%
+  cuBLAS: 0.009498 ms, 28.2635 TFLOPS, 5.7133% peak
+  check: PASS, max_abs=0.0066, max_rel=43.8835, bad_count=0
+
+Problem: 1024x1024x1024
+  dtype: tf32
+  custom: 0.153890 ms, 13.9547 TFLOPS, 2.8208% peak
+  roofline: AI=170.667 FLOP/B, mem_roof=571.733 TFLOPS, bound=compute, custom_roof=2.821%
+  cuBLAS: 0.016837 ms, 127.5470 TFLOPS, 25.7827% peak
+  check: PASS, max_abs=0.0106, max_rel=505.9354, bad_count=0
+
+Problem: 2048x2048x2048
+  dtype: tf32
+  custom: 1.181592 ms, 14.5396 TFLOPS, 2.9391% peak
+  roofline: AI=341.333 FLOP/B, mem_roof=1143.467 TFLOPS, bound=compute, custom_roof=2.939%
+  cuBLAS: 0.057990 ms, 296.2537 TFLOPS, 59.8855% peak
+  check: PASS, max_abs=0.0149, max_rel=2410.5517, bad_count=0
+
+Problem: 4096x4096x4096
+  dtype: tf32
+  custom: 9.337840 ms, 14.7185 TFLOPS, 2.9752% peak
+  roofline: AI=682.667 FLOP/B, mem_roof=2286.933 TFLOPS, bound=compute, custom_roof=2.975%
+  cuBLAS: 0.384622 ms, 357.3348 TFLOPS, 72.2326% peak
+  check: PASS, max_abs=0.0239, max_rel=4086.7632, bad_count=0

@@ -1,0 +1,51 @@
+=== 4x4 ===
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z23tensor_gemm_kernel_tf32PKfS0_Pfiii' for 'sm_90'
+ptxas info    : Function properties for _Z23tensor_gemm_kernel_tf32PKfS0_Pfiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16384 bytes smem
+ptxas info    : Compile time = 10.700 ms
+ptxas info    : Compiling entry function '_Z23tensor_gemm_kernel_bf16PK13__nv_bfloat16S1_Pfiii' for 'sm_90'
+ptxas info    : Function properties for _Z23tensor_gemm_kernel_bf16PK13__nv_bfloat16S1_Pfiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers
+ptxas info    : Compile time = 6.644 ms
+ptxas info    : Compiling entry function '_Z23tensor_gemm_kernel_fp16PK6__halfS1_Pfiii' for 'sm_90'
+ptxas info    : Function properties for _Z23tensor_gemm_kernel_fp16PK6__halfS1_Pfiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers
+ptxas info    : Compile time = 6.539 ms
+Hardware:
+  device: 0
+  name: NVIDIA H100 80GB HBM3
+  compute capability: 9.0
+  SM count: 132
+  warp size: 32
+  max threads per SM: 2048
+  max threads per block: 1024
+  SM clock: 1980.0 MHz
+  memory clock: 2619.0 MHz
+  global memory: 79.18 GiB
+  memory bus width: 5120 bit
+  L2 cache: 51200.0 KiB
+  shared memory per block: 48.0 KiB
+  shared memory per block opt-in: 227.0 KiB
+  shared memory per SM: 228.0 KiB
+  registers per block: 65536
+  registers per SM: 65536
+  benchmark dtype: tf32
+  theoretical Tensor Core dense peak used: 494.700 TFLOPS
+  HBM bandwidth used for roofline: 3.350 TB/s
+  custom kernel ready: yes
+Benchmark config:
+  warmup: 5
+  repeat: 20
+  check: no
+  cuBLAS timing: no
+  atol: 0.500
+  rtol: 0.050
+
+Problem: 4096x4096x4096
+  dtype: tf32
+  custom: 9.336547 ms, 14.7205 TFLOPS, 2.9756% peak
+  roofline: AI=682.667 FLOP/B, mem_roof=2286.933 TFLOPS, bound=compute, custom_roof=2.976%
