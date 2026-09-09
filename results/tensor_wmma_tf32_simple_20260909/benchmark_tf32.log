@@ -13,17 +13,17 @@ ptxas info    : Compiling entry function '_Z23tensor_gemm_kernel_tf32PKfS0_Pfiii
 ptxas info    : Function properties for _Z23tensor_gemm_kernel_tf32PKfS0_Pfiii
     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
 ptxas info    : Used 32 registers, used 0 barriers
-ptxas info    : Compile time = 18.868 ms
+ptxas info    : Compile time = 11.394 ms
 ptxas info    : Compiling entry function '_Z23tensor_gemm_kernel_bf16PK13__nv_bfloat16S1_Pfiii' for 'sm_90'
 ptxas info    : Function properties for _Z23tensor_gemm_kernel_bf16PK13__nv_bfloat16S1_Pfiii
     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
 ptxas info    : Used 24 registers, used 0 barriers
-ptxas info    : Compile time = 11.695 ms
+ptxas info    : Compile time = 6.609 ms
 ptxas info    : Compiling entry function '_Z23tensor_gemm_kernel_fp16PK6__halfS1_Pfiii' for 'sm_90'
 ptxas info    : Function properties for _Z23tensor_gemm_kernel_fp16PK6__halfS1_Pfiii
     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
 ptxas info    : Used 24 registers, used 0 barriers
-ptxas info    : Compile time = 11.671 ms
+ptxas info    : Compile time = 6.499 ms
 Hardware:
   device: 0
   name: NVIDIA H100 80GB HBM3
@@ -56,28 +56,28 @@ Benchmark config:
 
 Problem: 512x512x512
   dtype: tf32
-  custom: 0.029981 ms, 8.9536 TFLOPS, 1.8099% peak
-  roofline: AI=85.333 FLOP/B, mem_roof=285.867 TFLOPS, bound=memory, custom_roof=3.132%
-  cuBLAS: 0.007854 ms, 34.1764 TFLOPS, 6.9085% peak
+  custom: 0.031990 ms, 8.3911 TFLOPS, 1.6962% peak
+  roofline: AI=85.333 FLOP/B, mem_roof=285.867 TFLOPS, bound=memory, custom_roof=2.935%
+  cuBLAS: 0.009571 ms, 28.0462 TFLOPS, 5.6693% peak
   check: PASS, max_abs=0.0066, max_rel=43.8835, bad_count=0
 
 Problem: 1024x1024x1024
   dtype: tf32
-  custom: 0.241627 ms, 8.8876 TFLOPS, 1.7966% peak
-  roofline: AI=170.667 FLOP/B, mem_roof=571.733 TFLOPS, bound=compute, custom_roof=1.797%
-  cuBLAS: 0.015109 ms, 142.1346 TFLOPS, 28.7315% peak
+  custom: 0.139467 ms, 15.3978 TFLOPS, 3.1125% peak
+  roofline: AI=170.667 FLOP/B, mem_roof=571.733 TFLOPS, bound=compute, custom_roof=3.113%
+  cuBLAS: 0.016934 ms, 126.8119 TFLOPS, 25.6341% peak
   check: PASS, max_abs=0.0106, max_rel=505.9354, bad_count=0
 
 Problem: 2048x2048x2048
   dtype: tf32
-  custom: 1.445010 ms, 11.8891 TFLOPS, 2.4033% peak
-  roofline: AI=341.333 FLOP/B, mem_roof=1143.467 TFLOPS, bound=compute, custom_roof=2.403%
-  cuBLAS: 0.049102 ms, 349.8784 TFLOPS, 70.7254% peak
+  custom: 1.069462 ms, 16.0640 TFLOPS, 3.2472% peak
+  roofline: AI=341.333 FLOP/B, mem_roof=1143.467 TFLOPS, bound=compute, custom_roof=3.247%
+  cuBLAS: 0.058406 ms, 294.1436 TFLOPS, 59.4590% peak
   check: PASS, max_abs=0.0149, max_rel=2410.5517, bad_count=0
 
 Problem: 4096x4096x4096
   dtype: tf32
-  custom: 12.858126 ms, 10.6889 TFLOPS, 2.1607% peak
-  roofline: AI=682.667 FLOP/B, mem_roof=2286.933 TFLOPS, bound=compute, custom_roof=2.161%
-  cuBLAS: 0.516110 ms, 266.2976 TFLOPS, 53.8301% peak
+  custom: 8.386608 ms, 16.3879 TFLOPS, 3.3127% peak
+  roofline: AI=682.667 FLOP/B, mem_roof=2286.933 TFLOPS, bound=compute, custom_roof=3.313%
+  cuBLAS: 0.384515 ms, 357.4344 TFLOPS, 72.2528% peak
   check: PASS, max_abs=0.0239, max_rel=4086.7632, bad_count=0
