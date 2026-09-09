@@ -1,0 +1,49 @@
+ptxas info    : (C7510) Potential Performance Loss: wgmma.mma_async instructions are serialized due to wgmma pipeline crossing function boundary at a function call in the function '_ZN7cutlass13device_kernelINS_4gemm6kernel13GemmUniversalIN4cute5tupleIJiiiEEENS1_10collective13CollectiveMmaINS1_34MainloopSm90TmaGmmaWarpSpecializedILi3ENS5_IJNS4_1CILi2EEENSA_ILi1EEESC_EEENS1_35KernelTmaWarpSpecializedCooperativeEEENS5_IJNSA_ILi128EEESG_NSA_ILi64EEEEEEfNS5_IJlSC_lEEEfSJ_NS4_8TiledMMAINS4_8MMA_AtomIJNS4_4SM904GMMA30MMA_64x128x8_F32TF32TF32_SS_TNILNSN_7ScaleInE1ELSP_1EEEEEENS4_6LayoutISD_NS5_IJSC_NSA_ILi0EEEST_EEEEENS5_IJNS4_10UnderscoreESW_SW_EEEEENS4_13SM90_TMA_LOADENS4_14ComposedLayoutINS4_7SwizzleILi3ELi4ELi3EEENS4_18smem_ptr_flag_bitsILi32EEENSS_INS5_IJNSA_ILi8EEENSA_ILi32EEEEEENS5_IJS16_SC_EEEEEEEvNS4_8identityENS4_23SM90_TMA_LOAD_MULTICASTES1A_vS1B_EENS_8epilogue10collective6detail29Sm90TmaWarpSpecializedAdapterINS1F_15DefaultEpilogueIfSJ_SJ_NS1E_6thread17LinearCombinationIfLi1EffLNS1J_9ScaleType4KindE0ELNS_15FloatRoundStyleE2EfEENS1_15EpilogueDefaultEEEEEvvEEEEvNT_6ParamsE'
+ptxas info    : 2968 bytes gmem
+ptxas info    : Compiling entry function '_ZN7cutlass13device_kernelINS_4gemm6kernel13GemmUniversalIN4cute5tupleIJiiiEEENS1_10collective13CollectiveMmaINS1_34MainloopSm90TmaGmmaWarpSpecializedILi3ENS5_IJNS4_1CILi2EEENSA_ILi1EEESC_EEENS1_35KernelTmaWarpSpecializedCooperativeEEENS5_IJNSA_ILi128EEESG_NSA_ILi64EEEEEEfNS5_IJlSC_lEEEfSJ_NS4_8TiledMMAINS4_8MMA_AtomIJNS4_4SM904GMMA30MMA_64x128x8_F32TF32TF32_SS_TNILNSN_7ScaleInE1ELSP_1EEEEEENS4_6LayoutISD_NS5_IJSC_NSA_ILi0EEEST_EEEEENS5_IJNS4_10UnderscoreESW_SW_EEEEENS4_13SM90_TMA_LOADENS4_14ComposedLayoutINS4_7SwizzleILi3ELi4ELi3EEENS4_18smem_ptr_flag_bitsILi32EEENSS_INS5_IJNSA_ILi8EEENSA_ILi32EEEEEENS5_IJS16_SC_EEEEEEEvNS4_8identityENS4_23SM90_TMA_LOAD_MULTICASTES1A_vS1B_EENS_8epilogue10collective6detail29Sm90TmaWarpSpecializedAdapterINS1F_15DefaultEpilogueIfSJ_SJ_NS1E_6thread17LinearCombinationIfLi1EffLNS1J_9ScaleType4KindE0ELNS_15FloatRoundStyleE2EfEENS1_15EpilogueDefaultEEEEEvvEEEEvNT_6ParamsE' for 'sm_90a'
+ptxas info    : Function properties for _ZN7cutlass13device_kernelINS_4gemm6kernel13GemmUniversalIN4cute5tupleIJiiiEEENS1_10collective13CollectiveMmaINS1_34MainloopSm90TmaGmmaWarpSpecializedILi3ENS5_IJNS4_1CILi2EEENSA_ILi1EEESC_EEENS1_35KernelTmaWarpSpecializedCooperativeEEENS5_IJNSA_ILi128EEESG_NSA_ILi64EEEEEEfNS5_IJlSC_lEEEfSJ_NS4_8TiledMMAINS4_8MMA_AtomIJNS4_4SM904GMMA30MMA_64x128x8_F32TF32TF32_SS_TNILNSN_7ScaleInE1ELSP_1EEEEEENS4_6LayoutISD_NS5_IJSC_NSA_ILi0EEEST_EEEEENS5_IJNS4_10UnderscoreESW_SW_EEEEENS4_13SM90_TMA_LOADENS4_14ComposedLayoutINS4_7SwizzleILi3ELi4ELi3EEENS4_18smem_ptr_flag_bitsILi32EEENSS_INS5_IJNSA_ILi8EEENSA_ILi32EEEEEENS5_IJS16_SC_EEEEEEEvNS4_8identityENS4_23SM90_TMA_LOAD_MULTICASTES1A_vS1B_EENS_8epilogue10collective6detail29Sm90TmaWarpSpecializedAdapterINS1F_15DefaultEpilogueIfSJ_SJ_NS1E_6thread17LinearCombinationIfLi1EffLNS1J_9ScaleType4KindE0ELNS_15FloatRoundStyleE2EfEENS1_15EpilogueDefaultEEEEEvvEEEEvNT_6ParamsE
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 168 registers, used 1 barriers
+ptxas info    : Compile time = 127.640 ms
+Hardware:
+  device: 0
+  name: NVIDIA H100 80GB HBM3
+  compute capability: 9.0
+  SM count: 132
+  warp size: 32
+  shared memory per block: 48 KiB
+  shared memory per block opt-in: 227 KiB
+  shared memory per SM: 228 KiB
+  registers per SM: 65536
+  theoretical TF32 Tensor Core dense peak used: 494.700 TFLOPS
+  HBM bandwidth used for roofline: 3.350 TB/s
+  CUTLASS kernel: SM90 CollectiveBuilder, tile 128x128x64, cluster 2x1x1, auto stages/schedule
+  CUTLASS B operand is materialized as column-major B_col for the benchmark; public contract remains row-major C=A*B
+
+Problem: 512x512x512
+  dtype: tf32
+  custom CUTLASS: 0.016872 ms, 15.9101 TFLOPS, 3.2161% peak
+  roofline: AI=85.3333 FLOP/B, mem_roof=285.8667 TFLOPS, bound=memory, custom_roof=5.5656%
+  cuBLAS FAST_TF32: 0.009710 ms, 27.6441 TFLOPS, 5.5881% peak
+  check: PASS, max_abs=0.0000, max_rel=0.0000, bad_count=0
+
+Problem: 1024x1024x1024
+  dtype: tf32
+  custom CUTLASS: 0.025099 ms, 85.5598 TFLOPS, 17.2953% peak
+  roofline: AI=170.6667 FLOP/B, mem_roof=571.7333 TFLOPS, bound=compute, custom_roof=17.2953%
+  cuBLAS FAST_TF32: 0.016618 ms, 129.2295 TFLOPS, 26.1228% peak
+  check: PASS, max_abs=0.0000, max_rel=0.0000, bad_count=0
+
+Problem: 2048x2048x2048
+  dtype: tf32
+  custom CUTLASS: 0.084282 ms, 203.8389 TFLOPS, 41.2045% peak
+  roofline: AI=341.3333 FLOP/B, mem_roof=1143.4667 TFLOPS, bound=compute, custom_roof=41.2045%
+  cuBLAS FAST_TF32: 0.057326 ms, 299.6851 TFLOPS, 60.5792% peak
+  check: PASS, max_abs=0.0000, max_rel=0.0000, bad_count=0
+
+Problem: 4096x4096x4096
+  dtype: tf32
+  custom CUTLASS: 0.689306 ms, 199.3875 TFLOPS, 40.3047% peak
+  roofline: AI=682.6667 FLOP/B, mem_roof=2286.9333 TFLOPS, bound=compute, custom_roof=40.3047%
+  cuBLAS FAST_TF32: 0.381006 ms, 360.7261 TFLOPS, 72.9181% peak
+  check: PASS, max_abs=0.0000, max_rel=0.0000, bad_count=0
